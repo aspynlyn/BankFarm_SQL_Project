@@ -70,9 +70,78 @@ CREATE TABLE depo_contract
 # DROP TABLE depo_contract;
 
 # 예금 계약 상세 테이블
-create table depo_contract_deposit
+CREATE TABLE depo_contract_deposit
 (
     depo_contract_id BIGINT PRIMARY KEY COMMENT '계약 ID',
     depo_prncp_amt   BIGINT NOT NULL COMMENT '예치금',
     FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_prod_id)
+);
+
+# 적금 계약 상세 테이블
+CREATE TABLE depo_prod_savings
+(
+    depo_contract_id BIGINT PRIMARY KEY COMMENT '계약 ID',
+    depo_missed_cnt  INT     NOT NULL DEFAULT '0' COMMENT '미납 횟수',
+    depo_payment_day TINYINT NOT NULL COMMENT '월 납입 설정 일' CHECK ( depo_payment_day BETWEEN 1 AND 28),
+    depo_monthly_amt BIGINT  NOT NULL COMMENT '월 납입 예정 액',
+    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_prod_id)
+);
+
+# 적금 납입 내역 테이블
+CREATE TABLE depo_savings_payment
+(
+    depo_payment_id  BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '납입 ID',
+    depo_contract_id BIGINT  NOT NULL COMMENT '계약 ID',
+    depo_paid_dt     DATE    NOT NULL COMMENT '납입 일',
+    depo_paid_amt    BIGINT COMMENT '납입 액',
+    depo_payment_yn  CHAR(1) NOT NULL COMMENT '납입 여부' CHECK ( depo_payment_yn IN ('Y', 'N') ),
+    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
+);
+
+# 통화 테이블
+CREATE TABLE fx_currency
+(
+    fx_currency_id     CHAR(3) PRIMARY KEY COMMENT '통화 국제 표준 코드',
+    fx_nation          VARCHAR(50) NOT NULL COMMENT '국가 명',
+    fx_min_limit       INT         NOT NULL COMMENT '정수 변환에 필요한 보정 단위',
+    fx_currency_symbol VARCHAR(5) COMMENT '통화 기호',
+    fx_currency_nm     VARCHAR(20) COMMENT '통화 명칭',
+    fx_active_yn       CHAR(1)     NOT NULL DEFAULT 'Y' COMMENT '통화 활성화 여부' CHECK ( fx_active_yn IN ('Y', 'N') )
+);
+
+# 환전 기준 기록 테이블
+CREATE TABLE fx_rt_history
+(
+    fx_rt_id       BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기준 ID',
+    fx_currency_id CHAR(3)        NOT NULL COMMENT '통화 국제 표준 코드',
+    fx_charge_rt   DECIMAL(20, 4) NOT NULL COMMENT '매매 기준율',
+    fx_commission  DECIMAL(20, 4) NOT NULL COMMENT '수수료',
+    fx_crt_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (fx_currency_id) REFERENCES fx_currency (fx_currency_id)
+);
+
+ALTER TABLE fx_rt_history
+    MODIFY COLUMN fx_crt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시';
+
+# 환전 기준 감사 기록 테이블
+CREATE TABLE fx_rt_audit_history
+(
+    fx_audit_id            BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '감사 ID',
+    fx_rt_id               BIGINT       NOT NULL COMMENT '환전 기준 ID',
+    emp_id                 BIGINT       NOT NULL COMMENT '수정한 직원 ID',
+    fx_exchanged_attribute VARCHAR(30)  NOT NULL COMMENT '정정 속성',
+    fx_old_value           VARCHAR(30)  NOT NULL COMMENT '정정 전 값',
+    fx_new_value           VARCHAR(30)  NOT NULL COMMENT '정정 후 값',
+    fx_audit_reason        VARCHAR(100) NOT NULL COMMENT '정정 사유',
+    fx_audited_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '감사 일시'
+);
+
+# 환전 거래 기록 테이블
+create table fx_currency_exchange(
+    fx_trns_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기록 ID',
+    fx_rt_id BIGINT NOT NULL COMMENT '환전 기준 ID',
+    emp_id BIGINT NOT NULL COMMENT '직원 ID',
+    acct_id BIGINT NOT NULL COMMENT '계좌 ID',
+    fx_from_amt DECIMAL(18, 4) not null COMMENT '지불 금액',
+    fx_to_amt DECIMAL(18,4) not NULL COMMENT '환전 금액'
 );
