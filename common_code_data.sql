@@ -99,6 +99,12 @@ INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm,
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX011','OVERSEAS_DIRECT_INV','해외 직접 투자','거래 목적', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX012','REAL_ESTATE_ACQ','부동산 취급','거래 목적', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX013','OVERSEAS_DEPOSIT','해외 예금','거래 목적', CURRENT_TIMESTAMP);
+INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX021','REQ','신청됨','거래 상태', CURRENT_TIMESTAMP);
+INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX022','READY','외화 준비 완료','거래 상태', CURRENT_TIMESTAMP);
+INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX023','DONE','수령','거래 상태', CURRENT_TIMESTAMP);
+INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX024','CANCEL','직원/고객 취소','거래 상태', CURRENT_TIMESTAMP);
+INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX025','EXPIRE','기한 만료','거래 상태', CURRENT_TIMESTAMP);
+INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('FX','FX026','FAIL','시스템 오류','거래 상태', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('DO','DO001','DEMAND_DEPOSIT','요구불 예금','상품 타입', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('DO','DO002','TIME_DEPOSIT','정기 예금','상품 타입', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('DO','DO003','FIXED_SAVING','정기 적금','상품 타입', CURRENT_TIMESTAMP);
