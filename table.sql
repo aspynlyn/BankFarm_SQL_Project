@@ -61,7 +61,7 @@ CREATE TABLE depo_contract
     depo_contract_dt       DATE       NOT NULL COMMENT '가입 일자',
     depo_maturity_dt       DATE COMMENT '만기 일자',
     depo_applied_intrst_rt DECIMAL(6, 4) COMMENT '적용 금리',
-    depo_active_cd         VARCHAR(5) NOT NULL DEFAULT 'CS001',
+    depo_active_cd         VARCHAR(5) NOT NULL DEFAULT 'CS001' COMMENT '계약 상태 코드',
     FOREIGN KEY (cust_id) REFERENCES customer (cust_id),
     FOREIGN KEY (depo_prod_id) REFERENCES depo_prod (depo_prod_id),
     FOREIGN KEY (acct_id) REFERENCES account (acct_id),
@@ -78,7 +78,7 @@ CREATE TABLE depo_contract_deposit
 );
 
 # 적금 계약 상세 테이블
-CREATE TABLE depo_prod_savings
+CREATE TABLE depo_contract_savings
 (
     depo_contract_id BIGINT PRIMARY KEY COMMENT '계약 ID',
     depo_missed_cnt  INT     NOT NULL DEFAULT '0' COMMENT '미납 횟수',
@@ -106,7 +106,8 @@ CREATE TABLE fx_currency
     fx_min_limit       INT         NOT NULL COMMENT '정수 변환에 필요한 보정 단위',
     fx_currency_symbol VARCHAR(5) COMMENT '통화 기호',
     fx_currency_nm     VARCHAR(20) COMMENT '통화 명칭',
-    fx_active_yn       CHAR(1)     NOT NULL DEFAULT 'Y' COMMENT '통화 활성화 여부' CHECK ( fx_active_yn IN ('Y', 'N') )
+    fx_active_yn       CHAR(1)     NOT NULL DEFAULT 'Y' COMMENT '통화 활성화 여부' CHECK ( fx_active_yn IN ('Y', 'N') ),
+    fx_apply_start_dt  DATE        NOT NULL COMMENT '통화 적용 시작일'
 );
 
 # 환전 기준 기록 테이블
@@ -142,7 +143,8 @@ CREATE TABLE fx_currency_exchange
     fx_trns_id          BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기록 ID',
     fx_rt_id            BIGINT         NOT NULL COMMENT '환전 기준 ID',
     emp_id              BIGINT         NOT NULL COMMENT '직원 ID',
-    acct_id             BIGINT COMMENT '계좌 ID',
+    fx_from_acct_id     BIGINT COMMENT '출금 계좌 ID',
+    fx_to_acct_id       BIGINT COMMENT '입금 계좌 ID',
     fx_from_amt         DECIMAL(18, 4) NOT NULL COMMENT '지불 금액',
     fx_to_amt           DECIMAL(18, 4) NOT NULL COMMENT '환전 금액',
     fx_trns_tp          VARCHAR(5)     NOT NULL COMMENT '거래 타입',
@@ -151,57 +153,93 @@ CREATE TABLE fx_currency_exchange
     fx_trns_cd          VARCHAR(5)     NOT NULL COMMENT '거래 진행 상태',
     FOREIGN KEY (fx_rt_id) REFERENCES fx_rt_history (fx_rt_id),
     FOREIGN KEY (emp_id) REFERENCES employees (emp_id),
-    FOREIGN KEY (acct_id) REFERENCES account (acct_id)
+    FOREIGN KEY (fx_from_acct_id) REFERENCES account (acct_id),
+    FOREIGN KEY (fx_to_acct_id) REFERENCES account (acct_id)
 );
 
 # 제휴사 테이블
 CREATE TABLE partner
 (
-    part_id     BIGINT       PRIMARY KEY AUTO_INCREMENT COMMENT '제휴사 ID',
+    part_id     BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '제휴사 ID',
     part_nm     VARCHAR(100) NOT NULL COMMENT '제휴사명',
     part_tp     VARCHAR(50)  NOT NULL COMMENT '제휴사 타입',
     part_use_yn CHAR(1)      NOT NULL DEFAULT 'Y' COMMENT '사용 여부' CHECK ( part_use_yn IN ('Y', 'N'))
 );
 
 # 제휴사 계약 테이블
-CREATE TABLE part_contract (
+CREATE TABLE part_contract
+(
     part_contract_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '제휴사 계약 ID',
-    part_id          BIGINT NOT NULL COMMENT '제휴사 ID',
-    part_start_dt    DATE NOT NULL COMMENT '계약 시작일',
-    part_end_dt      DATE COMMENT '계약 종료일',
-    part_active_yn   VARCHAR(5) NOT NULL COMMENT '계약 상태',
-    FOREIGN KEY (part_id) REFERENCES partner(part_id)
+    part_id          BIGINT     NOT NULL COMMENT '제휴사 ID',
+    part_start_dt    DATE       NOT NULL COMMENT '계약 시작일',
+    part_end_dt      DATE       NOT NULL COMMENT '계약 종료일',
+    part_active_yn   VARCHAR(5) NOT NULL COMMENT '계약 상태 여부' CHECK ( part_active_yn IN ('Y', 'N')),
+    FOREIGN KEY (part_id) REFERENCES partner (part_id)
 );
 
 # 보험 상품 테이블
-CREATE TABLE insr_prod (
-    insr_prod_id     BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '보험 상품 ID',
-    part_id          BIGINT NOT NULL COMMENT '제휴사 ID',
-    insr_cd          VARCHAR(30) NOT NULL UNIQUE COMMENT '상품 코드',
-    insr_nm          VARCHAR(100) NOT NULL COMMENT '상품명',
-    insr_prod_tp     VARCHAR(10) NOT NULL COMMENT '상품 타입',
-    insr_open_dt     DATE NOT NULL COMMENT '판매 시작일',
-    insr_close_dt    DATE NULL COMMENT '판매 종료일',
-    insr_commission   DECIMAL(15,2) NOT NULL COMMENT '수수료',
-    insr_sale_yn     CHAR(1) NOT NULL DEFAULT 'Y' COMMENT '판매 여부' CHECK ( insr_sale_yn IN ('Y', 'N')),
-    FOREIGN KEY (part_id) REFERENCES partner(part_id)
+CREATE TABLE insr_prod
+(
+    insr_prod_id    BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '보험 상품 ID',
+    part_id         BIGINT         NOT NULL COMMENT '제휴사 ID',
+    insr_cd         VARCHAR(30)    NOT NULL UNIQUE COMMENT '상품 코드',
+    insr_nm         VARCHAR(100)   NOT NULL COMMENT '상품명',
+    insr_prod_tp    VARCHAR(10)    NOT NULL COMMENT '상품 타입',
+    insr_open_dt    DATE           NOT NULL COMMENT '판매 시작일',
+    insr_close_dt   DATE           NULL COMMENT '판매 종료일',
+    insr_commission DECIMAL(15, 2) NOT NULL COMMENT '수수료',
+    insr_sale_yn    CHAR(1)        NOT NULL DEFAULT 'Y' COMMENT '판매 여부' CHECK ( insr_sale_yn IN ('Y', 'N')),
+    FOREIGN KEY (part_id) REFERENCES partner (part_id)
 );
 
 # 보험 계약 테이블
-CREATE TABLE insr_contract (
-    insr_contract_id   BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '보험 계약 ID',
-    insr_prod_id       BIGINT NOT NULL COMMENT '보험 상품 ID',
-    emp_id             BIGINT NOT NULL COMMENT '직원 ID',
-    insr_contract_num  VARCHAR(20) NULL COMMENT '계약 번호',
-    insr_bank_cd       VARCHAR(20) NULL COMMENT '계약 은행 코드',
-    insr_act_num       VARCHAR(20) NULL COMMENT '계약 계좌 번호',
-    insr_contract_dt   DATETIME NULL COMMENT '계약 일시',
-    insr_maturity_dt   DATE NULL COMMENT '만기일',
-    insr_approval_cd   VARCHAR(5) NOT NULL COMMENT '승인 상태 코드',
-    insr_active_cd     VARCHAR(5) NOT NULL COMMENT '보험 활성 코드',
-    insr_renewable_yn  CHAR(1) NOT NULL COMMENT '갱신 가능 여부',
-    insr_refund_amt    DECIMAL(15,2) NULL COMMENT '환급금',
-    insr_payment_day   TINYINT NOT NULL COMMENT '납입일(1~28)' CHECK ( insr_payment_day BETWEEN 1 AND 28),
-    FOREIGN KEY (insr_prod_id) REFERENCES insr_prod(insr_prod_id),
-    FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
+CREATE TABLE insr_contract
+(
+    insr_contract_id    BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '보험 계약 ID',
+    insr_prod_id        BIGINT     NOT NULL COMMENT '보험 상품 ID',
+    cust_id             BIGINT     NOT NULL COMMENT '고객 ID',
+    emp_id              BIGINT     NOT NULL COMMENT '직원 ID',
+    insr_contract_num   VARCHAR(20) COMMENT '계약 번호',
+    insr_bank_cd        CHAR(5) COMMENT '계약 은행 코드',
+    insr_acct_num       VARCHAR(20) COMMENT '계약 계좌 번호',
+    insr_contract_dt    DATETIME COMMENT '계약 일시',
+    insr_payment_end_dt DATE COMMENT '납입 종료일',
+    insr_maturity_dt    DATE COMMENT '만기일',
+    insr_approval_cd    VARCHAR(5) NOT NULL COMMENT '승인 상태 코드',
+    insr_active_cd      VARCHAR(5) NOT NULL DEFAULT 'CS001' COMMENT '계약 상태 코드',
+    insr_renewable_yn   CHAR(1)    NOT NULL COMMENT '갱신 가능 여부',
+    insr_refund_amt     BIGINT     NULL COMMENT '환급금',
+    insr_payment_day    TINYINT    NOT NULL COMMENT '납입일(1~28)' CHECK ( insr_payment_day BETWEEN 1 AND 28),
+    FOREIGN KEY (insr_prod_id) REFERENCES insr_prod (insr_prod_id),
+    FOREIGN KEY (emp_id) REFERENCES employees (emp_id),
+    FOREIGN KEY (cust_id) REFERENCES customer (cust_id)
 );
+
+# 보험 납입 내역 테이블
+CREATE TABLE insr_payment_history
+(
+    insr_payment_seq  INT COMMENT '납입 회차',
+    insr_contract_id  BIGINT COMMENT '보험 계약 ID',
+    insr_payment_dt   DATE    NOT NULL COMMENT '납입 예정일',
+    insr_expected_amt BIGINT  NOT NULL COMMENT '예정 납입 금액',
+    insr_paid_dt      DATE    NULL COMMENT '실제 납입 일자',
+    insr_paid_amt     BIGINT  NULL COMMENT '실제 납입 금액',
+    insr_paid_yn      CHAR(1) NOT NULL DEFAULT 'N' COMMENT '납입 여부',
+    insr_od_yn        CHAR(1) NOT NULL DEFAULT 'N' COMMENT '연체 여부',
+    PRIMARY KEY (insr_payment_seq, insr_contract_id),
+    FOREIGN KEY (insr_contract_id) REFERENCES insr_contract (insr_contract_id)
+);
+
+# 보험 해지/만기 정보 테이블
+CREATE TABLE insr_term
+(
+    insr_term_id     BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '해지/만기 ID',
+    insr_contract_id BIGINT     NOT NULL COMMENT '보험 계약 ID',
+    insr_term_tp     VARCHAR(5) NOT NULL COMMENT '해지/만기 타입',
+    insr_term_dt     DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '해지/만기 일',
+    insr_term_reason VARCHAR(200) COMMENT '해지/만기 사유',
+    FOREIGN KEY (insr_contract_id) REFERENCES insr_contract (insr_contract_id)
+);
+
+ALTER TABLE customer
+    ADD COLUMN cust_withdrawn_yn CHAR(1) NOT NULL DEFAULT 'N' COMMENT '탈퇴 여부' CHECK ( cust_withdrawn_yn IN ('Y', 'N'));
