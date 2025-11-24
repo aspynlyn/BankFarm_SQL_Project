@@ -1,22 +1,22 @@
 # 상위 코드 테이블
-CREATE TABLE super_code
+CREATE TABLE cd_super_code
 (
-    sc_cd_id      CHAR(2) PRIMARY KEY COMMENT '상위 코드 ID',
-    sc_cd_nm      VARCHAR(100) NOT NULL COMMENT '상위 코드 이름',
-    sc_cd_des     VARCHAR(100) NOT NULL COMMENT '상위 코드 설명',
-    sc_created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시'
+    sc_cd_id  CHAR(2) PRIMARY KEY COMMENT '상위 코드 ID',
+    sc_cd_nm  VARCHAR(100) NOT NULL COMMENT '상위 코드 이름',
+    sc_cd_des VARCHAR(100) NOT NULL COMMENT '상위 코드 설명',
+    sc_crt_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시'
 );
 
 # 공통 코드 데이블
-CREATE TABLE common_code
+CREATE TABLE cd_common_code
 (
     sc_cd_id       CHAR(2) COMMENT '상위 코드 ID',
     cc_cd_id       CHAR(5) COMMENT '공통 코드 ID',
     cc_cd_nm       VARCHAR(100) NOT NULL COMMENT '공통 코드 이름',
     cc_cd_des      VARCHAR(100) NOT NULL COMMENT '공통 코드 설명',
     cc_category_nm VARCHAR(100) NULL COMMENT '코드 카테고리 이름',
-    cc_created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
-    FOREIGN KEY (sc_cd_id) REFERENCES super_code (sc_cd_id),
+    cc_crt_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시',
+    FOREIGN KEY (sc_cd_id) REFERENCES cd_super_code (sc_cd_id),
     PRIMARY KEY (sc_cd_id, cc_cd_id)
 );
 
@@ -117,12 +117,9 @@ CREATE TABLE fx_rt_history
     fx_currency_id CHAR(3)        NOT NULL COMMENT '통화 국제 표준 코드',
     fx_charge_rt   DECIMAL(20, 4) NOT NULL COMMENT '매매 기준율',
     fx_commission  DECIMAL(20, 4) NOT NULL COMMENT '수수료',
-    fx_crt_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fx_crt_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '등록 일시',
     FOREIGN KEY (fx_currency_id) REFERENCES fx_currency (fx_currency_id)
 );
-
-ALTER TABLE fx_rt_history
-    MODIFY COLUMN fx_crt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성 일시';
 
 # 환전 기준 감사 기록 테이블
 CREATE TABLE fx_rt_audit_history
@@ -161,7 +158,7 @@ CREATE TABLE fx_currency_exchange
 CREATE TABLE partner
 (
     part_id     BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '제휴사 ID',
-    part_nm     VARCHAR(100) NOT NULL COMMENT '제휴사명',
+    part_nm     VARCHAR(100) NOT NULL UNIQUE COMMENT '제휴사명',
     part_tp     VARCHAR(50)  NOT NULL COMMENT '제휴사 타입',
     part_use_yn CHAR(1)      NOT NULL DEFAULT 'Y' COMMENT '사용 여부' CHECK ( part_use_yn IN ('Y', 'N'))
 );
@@ -173,7 +170,7 @@ CREATE TABLE part_contract
     part_id          BIGINT     NOT NULL COMMENT '제휴사 ID',
     part_start_dt    DATE       NOT NULL COMMENT '계약 시작일',
     part_end_dt      DATE       NOT NULL COMMENT '계약 종료일',
-    part_active_yn   VARCHAR(5) NOT NULL COMMENT '계약 상태 여부' CHECK ( part_active_yn IN ('Y', 'N')),
+    part_active_yn   VARCHAR(5) NOT NULL DEFAULT 'Y' COMMENT '계약 상태 여부' CHECK ( part_active_yn IN ('Y', 'N')),
     FOREIGN KEY (part_id) REFERENCES partner (part_id)
 );
 
@@ -182,8 +179,8 @@ CREATE TABLE insr_prod
 (
     insr_prod_id    BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '보험 상품 ID',
     part_id         BIGINT         NOT NULL COMMENT '제휴사 ID',
-    insr_cd         VARCHAR(30)    NOT NULL UNIQUE COMMENT '상품 코드',
-    insr_nm         VARCHAR(100)   NOT NULL COMMENT '상품명',
+    insr_prod_cd    VARCHAR(30)    NOT NULL UNIQUE COMMENT '상품 코드',
+    insr_prod_nm    VARCHAR(100)   NOT NULL COMMENT '상품명',
     insr_prod_tp    VARCHAR(10)    NOT NULL COMMENT '상품 타입',
     insr_open_dt    DATE           NOT NULL COMMENT '판매 시작일',
     insr_close_dt   DATE           NULL COMMENT '판매 종료일',
@@ -233,8 +230,7 @@ CREATE TABLE insr_payment_history
 # 보험 해지/만기 정보 테이블
 CREATE TABLE insr_term
 (
-    insr_term_id     BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '해지/만기 ID',
-    insr_contract_id BIGINT     NOT NULL COMMENT '보험 계약 ID',
+    insr_contract_id BIGINT PRIMARY KEY COMMENT '보험 계약 ID',
     insr_term_tp     VARCHAR(5) NOT NULL COMMENT '해지/만기 타입',
     insr_term_dt     DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '해지/만기 일',
     insr_term_reason VARCHAR(200) COMMENT '해지/만기 사유',
