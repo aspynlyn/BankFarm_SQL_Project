@@ -30,6 +30,7 @@ CREATE TABLE depo_prod
     depo_prod_nm          VARCHAR(50)  NOT NULL COMMENT '상품명',
     depo_start_dt         DATE         NOT NULL COMMENT '판매 시작일',
     depo_end_dt           DATE COMMENT '판매 종료일',
+    depo_prod_tp          VARCHAR(5)   NOT NULL COMMENT '상품 타입',
     depo_prod_des         VARCHAR(255) NOT NULL COMMENT '상품 설명',
     depo_intrst_calc_unit VARCHAR(5)   NOT NULL COMMENT '이자 계산 단위',
     depo_intrst_pay_cycle VARCHAR(5)   NOT NULL COMMENT '이자 지급 주기',
@@ -239,3 +240,6 @@ CREATE TABLE insr_term
 
 ALTER TABLE customer
     ADD COLUMN cust_withdrawn_yn CHAR(1) NOT NULL DEFAULT 'N' COMMENT '탈퇴 여부' CHECK ( cust_withdrawn_yn IN ('Y', 'N'));
+
+SELECT * FROM performance_schema.data_locks;
+SELECT * FROM performance_schema.data_lock_waits;
