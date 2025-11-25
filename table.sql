@@ -63,11 +63,15 @@ CREATE TABLE depo_contract
     depo_maturity_dt       DATE COMMENT '만기 일자',
     depo_applied_intrst_rt DECIMAL(6, 4) COMMENT '적용 금리',
     depo_active_cd         VARCHAR(5) NOT NULL DEFAULT 'CS001' COMMENT '계약 상태 코드',
+    depo_payout_bank_cd    VARCHAR(5) COMMENT '지급 은행 코드',
+    depo_payout_acct_num   VARCHAR(20) COMMENT '지급 계좌 번호',
+    depo_payout_tp         VARCHAR(5) COMMENT '지급 방식',
     FOREIGN KEY (cust_id) REFERENCES customer (cust_id),
     FOREIGN KEY (depo_prod_id) REFERENCES depo_prod (depo_prod_id),
     FOREIGN KEY (acct_id) REFERENCES account (acct_id),
     FOREIGN KEY (emp_id) REFERENCES employees (emp_id)
 );
+
 # DROP TABLE depo_contract;
 
 # 예금 계약 상세 테이블
@@ -241,5 +245,7 @@ CREATE TABLE insr_term
 ALTER TABLE customer
     ADD COLUMN cust_withdrawn_yn CHAR(1) NOT NULL DEFAULT 'N' COMMENT '탈퇴 여부' CHECK ( cust_withdrawn_yn IN ('Y', 'N'));
 
-SELECT * FROM performance_schema.data_locks;
-SELECT * FROM performance_schema.data_lock_waits;
+SELECT *
+FROM performance_schema.data_locks;
+SELECT *
+FROM performance_schema.data_lock_waits;

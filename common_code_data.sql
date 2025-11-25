@@ -138,6 +138,11 @@ INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm,
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('PA','PA008','FOOD','음식/카페 제휴사','제휴사 타입', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_created_at) VALUES ('PA','PA009','ETC','기타 제휴처','제휴사 타입', CURRENT_TIMESTAMP);
 
+INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO031','CASH','현금 수령','지급 방식', CURRENT_TIMESTAMP);
+INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO032','TRANSFER','지정 계좌 이체','지급 방식', CURRENT_TIMESTAMP);
+INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO033','AUTO_RENEW_PI','자동 재예치(원리금)','지급 방식', CURRENT_TIMESTAMP);
+INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO034','AUTO_RENEW_P','자동 재예치(원금)','지급 방식', CURRENT_TIMESTAMP);
+
 
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) VALUES ('CS','CS001','EFFECTIVE','유효', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) VALUES ('CS','CS002','EXPIRED','만기', CURRENT_TIMESTAMP);
