@@ -79,7 +79,7 @@ CREATE TABLE depo_contract_deposit
 (
     depo_contract_id BIGINT PRIMARY KEY COMMENT '계약 ID',
     depo_prncp_amt   BIGINT NOT NULL COMMENT '예치금',
-    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_prod_id)
+    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
 );
 
 # 적금 계약 상세 테이블
@@ -89,8 +89,9 @@ CREATE TABLE depo_contract_savings
     depo_missed_cnt  INT     NOT NULL DEFAULT '0' COMMENT '미납 횟수',
     depo_payment_day TINYINT NOT NULL COMMENT '월 납입 설정 일' CHECK ( depo_payment_day BETWEEN 1 AND 28),
     depo_monthly_amt BIGINT  NOT NULL COMMENT '월 납입 예정 액',
-    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_prod_id)
+    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
 );
+
 
 # 적금 납입 내역 테이블
 CREATE TABLE depo_savings_payment
