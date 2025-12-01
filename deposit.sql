@@ -102,3 +102,5 @@ set depo_applied_intrst_rt = 2.1349
 where depo_contract_id BETWEEN 301102 and 301304;
 # 301102
 # 363861
+
+# 377761

@@ -141,7 +141,7 @@ CREATE TABLE fx_rt_audit_history
 );
 
 # 환전 거래 기록 테이블
-drop TABLE fx_currency_exchange;
+DROP TABLE fx_currency_exchange;
 CREATE TABLE fx_currency_exchange
 (
     fx_trns_id          BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기록 ID',
@@ -153,7 +153,7 @@ CREATE TABLE fx_currency_exchange
     fx_to_amt           DECIMAL(18, 4) NOT NULL COMMENT '환전 금액',
     fx_trns_tp          VARCHAR(5)     NOT NULL COMMENT '거래 타입',
     fx_exchange_purpose VARCHAR(5)     NOT NULL COMMENT '거래 유형/성격',
-    fx_trns_dt          DATE           NOT NULL COMMENT '거래 일',
+    fx_trns_dt          DATETIME COMMENT '거래 일',
     fx_trns_cd          VARCHAR(5)     NOT NULL COMMENT '거래 진행 상태',
     FOREIGN KEY (fx_rt_id) REFERENCES fx_rt_history (fx_rt_id),
     FOREIGN KEY (emp_id) REFERENCES employees (emp_id),
