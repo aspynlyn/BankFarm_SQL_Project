@@ -39,12 +39,66 @@ where bran_id > 264;
 # 계좌 아이디 300511
 # 계약 아이디 300509
 # 상품 아이디 458
+SELECT *
+FROM prod_document
+where doc_prod_id = 300515
+and doc_prod_tp = 'PD006';
+
 DELETE
 FROM prod_document
-where doc_prod_id = 458
-and doc_prod_tp = 'PD006'
-and doc_nm like '%자유%';
+where doc_prod_id = 300515
+and doc_prod_tp = 'PD006';
+
+SELECT *
+from depo_prod
+where depo_prod_id = 402;
+SELECT *
+FROM depo_contract
+where depo_contract_id = 300513;
+
+DELETE from depo_savings_payment;
+
+DELETE from depo_contract_deposit;
 
 DELETE
 FROM depo_contract
-where depo_contract_id = 300509;
+where depo_contract_id = 300515;
+
+SELECT *
+from account
+where acct_id = 300517;
+
+DELETE
+from account
+where acct_id = 300517;
+
+delete
+from transaction
+where acct_id = 300517;
+
+SELECT prod_id
+from prod_rate
+where prod_tp = 'RT006'
+GROUP BY prod_id;
+
+        SELECT count(depo_prod_id)
+        FROM depo_prod
+        WHERE depo_prod_tp = 'DO001';
+
+SELECT *
+from prod_document
+where doc_nm = '정기 적금 계약 문서 제목'
+or doc_nm = '정기 예금 계약 문서 제목'
+or doc_nm = '자유 적금 계약 문서 제목';
+
+# 301304
+
+SELECT *
+from depo_contract
+where depo_contract_id = 301304;
+
+UPDATE depo_contract
+set depo_applied_intrst_rt = 2.1349
+where depo_contract_id BETWEEN 301102 and 301304;
+# 301102
+# 363861

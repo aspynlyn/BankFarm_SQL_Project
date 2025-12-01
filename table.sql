@@ -141,6 +141,7 @@ CREATE TABLE fx_rt_audit_history
 );
 
 # 환전 거래 기록 테이블
+drop TABLE fx_currency_exchange;
 CREATE TABLE fx_currency_exchange
 (
     fx_trns_id          BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기록 ID',
