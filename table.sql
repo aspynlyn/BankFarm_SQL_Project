@@ -72,6 +72,17 @@ CREATE TABLE depo_contract
     FOREIGN KEY (emp_id) REFERENCES employees (emp_id)
 );
 
+ALTER TABLE depo_contract
+    ADD COLUMN depo_base_acct_id BIGINT COMMENT '예치/납입/지급 시의 요구불 계좌' AFTER acct_id;
+
+ALTER TABLE depo_contract
+  ADD FOREIGN KEY (depo_base_acct_id)
+    REFERENCES account (acct_id);
+
+ALTER TABLE depo_contract
+  DROP COLUMN depo_payout_bank_cd,
+  DROP COLUMN depo_payout_acct_num;
+
 # DROP TABLE depo_contract;
 
 # 예금 계약 상세 테이블
@@ -141,7 +152,7 @@ CREATE TABLE fx_rt_audit_history
 );
 
 # 환전 거래 기록 테이블
-drop TABLE fx_currency_exchange;
+DROP TABLE fx_currency_exchange;
 CREATE TABLE fx_currency_exchange
 (
     fx_trns_id          BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기록 ID',
