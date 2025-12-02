@@ -1,104 +1,3 @@
-DELETE
-FROM depo_prod
-WHERE depo_prod_tp != 'DO001';
-
-SELECT rt_id
-FROM rate_rule
-WHERE rt_tp = 'RT001';
-
-DELETE
-FROM prod_rate;
-SELECT COUNT(1)
-FROM prod_rate
-GROUP BY prod_id;
-
--- # 우대금리 계산
-SELECT p.prod_id,
-       SUM(r.rt_pct) AS total_pref_rate
-FROM rate_rule r
-         JOIN prod_rate p
-              ON p.prod_rt_id = r.rt_id
-WHERE p.prod_id = 400
-  AND p.prod_tp = 'RT006'
-GROUP BY p.prod_id;
-
-select emp_id
-from employees
-where bran_id > 264;
-
--- # 384 683
-        SELECT p.prod_id,
-            SUM(r.rt_pct) AS total_pref_rate
-        FROM rate_rule r
-        JOIN prod_rate p
-        ON p.prod_rt_id = r.rt_id
-        WHERE p.prod_id = 444
-        AND p.prod_tp = 'RT006'
-        GROUP BY p.prod_id;
-
--- # 계좌 아이디 300511
--- # 계약 아이디 300509
--- # 상품 아이디 458
-SELECT *
-FROM prod_document
-where doc_prod_id = 300515
-and doc_prod_tp = 'PD006';
-
-DELETE
-FROM prod_document
-where doc_prod_id = 300515
-and doc_prod_tp = 'PD006';
-
-SELECT *
-from depo_prod
-where depo_prod_id = 402;
-SELECT *
-FROM depo_contract
-where depo_contract_id = 300513;
-
-DELETE from depo_savings_payment;
-
-DELETE from depo_contract_deposit;
-
-DELETE
-FROM depo_contract
-where depo_contract_id = 300515;
-
-SELECT *
-from account
-where acct_id = 300517;
-
-DELETE
-from account
-where acct_id = 300517;
-
-delete
-from transaction
-where acct_id = 300517;
-
-SELECT prod_id
-from prod_rate
-where prod_tp = 'RT006'
-GROUP BY prod_id;
-
-        SELECT count(depo_prod_id)
-        FROM depo_prod
-        WHERE depo_prod_tp = 'DO001';
-
-SELECT *
-from prod_document
-where doc_nm = '정기 적금 계약 문서 제목'
-or doc_nm = '정기 예금 계약 문서 제목'
-or doc_nm = '자유 적금 계약 문서 제목';
-
-SELECT *
-from depo_contract
-where depo_contract_id = 301304;
-
-UPDATE depo_contract
-set depo_applied_intrst_rt = 2.1349
-where depo_contract_id BETWEEN 301102 and 301304;
-
 -- 계좌 상태 확인 및 고객 일치 확인 프로시저
 CREATE PROCEDURE sp_validate_account_owner (
       IN p_acct_id BIGINT
@@ -108,31 +7,92 @@ BEGIN
     DECLARE v_cust_id BIGINT;
     DECLARE v_status  VARCHAR(5);
 
-    SELECT cust_id, acct_st_cd
+    SELECT cust_id, acct_sts_cd
       INTO v_cust_id, v_status
       FROM account
      WHERE acct_id = p_acct_id
      FOR UPDATE;
 
-    IF v_status IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 없음';
+    IF v_status = 'AS002' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 비활성화 상태';
     END IF;
 
-    IF v_status <> 'NORMAL' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 상태 비정상';
+        IF v_status = 'AS003' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 휴면 상태';
     END IF;
 
-    IF v_cust_id <> p_cust_id THEN
+        IF v_status = 'AS004' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 법적 동결 상태';
+    END IF;
+
+        IF v_status = 'AS005' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '해지된 계좌';
+    END IF;
+
+    IF v_cust_id != p_cust_id THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계약 고객과 계좌 소유자 불일치';
     END IF;
+
 END;
 
 DELIMITER $$
 
+-- 계좌 잔액 확인(출금용) 프로시저
+CREATE PROCEDURE sp_account_debit (
+      IN  p_acct_id       BIGINT
+    , IN  p_amt        BIGINT
+)
+BEGIN
+    DECLARE v_bal BIGINT;
+
+    SELECT acct_bal
+      INTO v_bal
+      FROM account
+     WHERE acct_id = p_acct_id
+     FOR UPDATE;
+
+    IF v_bal < p_amt THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '잔액 부족';
+    END IF;
+
+END;
+
+-- 입출금 내역 인서트 프로시저
+CREATE PROCEDURE sp_insert_tran_history (
+      IN p_acct_id   BIGINT
+    , IN p_amt    BIGINT
+    , in p_acct_num varchar(20)
+    , IN p_bal   BIGINT
+    , IN p_trns_tp   TINYINT
+    , IN p_des       VARCHAR(30)
+)
+BEGIN
+    INSERT INTO transaction (
+          acct_id
+        , trns_fee_id
+        , trns_amt
+        , trns_acct_num
+        , trns_bal
+        , trns_tp
+        , trns_crt_at
+        , trns_des
+    ) VALUES (
+          p_acct_id
+        , 0
+        , p_amt
+        , p_acct_num
+        , p_bal
+        , p_trns_tp
+        , NOW()
+        , p_des
+    );
+END;
+
+-- 적금 계약 프로시저
 CREATE PROCEDURE sp_open_savings_contract (
       IN  p_cust_id        BIGINT
     , IN  p_depo_prod_id   BIGINT
-    , IN  p_acct_id        BIGINT          -- 적금 계좌(원장)
+    , IN  p_acct_num       varchar(20)          -- 생성할 계좌 번호
     , IN  p_base_acct_id   BIGINT          -- 결제 계좌(요구불), 현금이면 NULL
     , IN  p_monthly_amt    BIGINT          -- 월 납입액
     , IN  p_emp_id         BIGINT
