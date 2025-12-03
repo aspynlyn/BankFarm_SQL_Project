@@ -22,261 +22,89 @@ WHERE p.prod_id = 400
   AND p.prod_tp = 'RT006'
 GROUP BY p.prod_id;
 
-select emp_id
-from employees
-where bran_id > 264;
+SELECT emp_id
+FROM employees
+WHERE bran_id > 264;
 
 -- # 384 683
-        SELECT p.prod_id,
-            SUM(r.rt_pct) AS total_pref_rate
-        FROM rate_rule r
-        JOIN prod_rate p
-        ON p.prod_rt_id = r.rt_id
-        WHERE p.prod_id = 444
-        AND p.prod_tp = 'RT006'
-        GROUP BY p.prod_id;
+SELECT p.prod_id,
+       SUM(r.rt_pct) AS total_pref_rate
+FROM rate_rule r
+         JOIN prod_rate p
+              ON p.prod_rt_id = r.rt_id
+WHERE p.prod_id = 444
+  AND p.prod_tp = 'RT006'
+GROUP BY p.prod_id;
 
 -- # 계좌 아이디 300511
 -- # 계약 아이디 300509
 -- # 상품 아이디 458
 SELECT *
 FROM prod_document
-where doc_prod_id = 300515
-and doc_prod_tp = 'PD006';
+WHERE doc_prod_id = 300515
+  AND doc_prod_tp = 'PD006';
 
 DELETE
 FROM prod_document
-where doc_prod_id = 300515
-and doc_prod_tp = 'PD006';
+WHERE doc_prod_id = 300515
+  AND doc_prod_tp = 'PD006';
 
 SELECT *
-from depo_prod
-where depo_prod_id = 402;
+FROM depo_prod
+WHERE depo_prod_id = 402;
 SELECT *
 FROM depo_contract
-where depo_contract_id = 300513;
+WHERE depo_contract_id = 300513;
 
-DELETE from depo_savings_payment;
+DELETE
+FROM depo_savings_payment;
 
-DELETE from depo_contract_deposit;
+DELETE
+FROM depo_contract_deposit;
 
 DELETE
 FROM depo_contract
-where depo_contract_id = 300515;
+WHERE depo_contract_id = 300515;
 
 SELECT *
-from account
-where acct_id = 300517;
+FROM account
+WHERE acct_id = 300517;
 
 DELETE
-from account
-where acct_id = 300517;
+FROM account
+WHERE acct_id = 300517;
 
-delete
-from transaction
-where acct_id = 300517;
+DELETE
+FROM transaction
+WHERE acct_id = 300517;
 
 SELECT prod_id
-from prod_rate
-where prod_tp = 'RT006'
+FROM prod_rate
+WHERE prod_tp = 'RT006'
 GROUP BY prod_id;
 
-        SELECT count(depo_prod_id)
-        FROM depo_prod
-        WHERE depo_prod_tp = 'DO001';
+SELECT COUNT(depo_prod_id)
+FROM depo_prod
+WHERE depo_prod_tp = 'DO001';
 
 SELECT *
-from prod_document
-where doc_nm = '정기 적금 계약 문서 제목'
-or doc_nm = '정기 예금 계약 문서 제목'
-or doc_nm = '자유 적금 계약 문서 제목';
+FROM prod_document
+WHERE doc_nm = '정기 적금 계약 문서 제목'
+   OR doc_nm = '정기 예금 계약 문서 제목'
+   OR doc_nm = '자유 적금 계약 문서 제목';
 
 SELECT *
-from depo_contract
-where depo_contract_id = 301304;
+FROM depo_contract
+WHERE depo_contract_id = 301304;
 
 UPDATE depo_contract
-set depo_applied_intrst_rt = 2.1349
-where depo_contract_id BETWEEN 301102 and 301304;
+SET depo_applied_intrst_rt = 2.1349
+WHERE depo_contract_id BETWEEN 301102 AND 301304;
 
--- 계좌 상태 확인 및 고객 일치 확인 프로시저
-CREATE PROCEDURE sp_validate_account_owner (
-      IN p_acct_id BIGINT
-    , IN p_cust_id BIGINT
-)
-BEGIN
-    DECLARE v_cust_id BIGINT;
-    DECLARE v_status  VARCHAR(5);
-
-    SELECT cust_id, acct_st_cd
-      INTO v_cust_id, v_status
-      FROM account
-     WHERE acct_id = p_acct_id
-     FOR UPDATE;
-
-    IF v_status IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 없음';
-    END IF;
-
-    IF v_status <> 'NORMAL' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 상태 비정상';
-    END IF;
-
-    IF v_cust_id <> p_cust_id THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계약 고객과 계좌 소유자 불일치';
-    END IF;
-END;
-
-DELIMITER $$
-
-CREATE PROCEDURE sp_open_savings_contract (
-      IN  p_cust_id        BIGINT
-    , IN  p_depo_prod_id   BIGINT
-    , IN  p_acct_id        BIGINT          -- 적금 계좌(원장)
-    , IN  p_base_acct_id   BIGINT          -- 결제 계좌(요구불), 현금이면 NULL
-    , IN  p_monthly_amt    BIGINT          -- 월 납입액
-    , IN  p_emp_id         BIGINT
-    , IN  p_payment_day    TINYINT         -- 1~28
-    , OUT p_depo_contract_id BIGINT
-)
-BEGIN
-    DECLARE v_min_amt INT;
-    DECLARE v_max_amt INT;
-    DECLARE v_depo_rt DECIMAL(6,4);
-    DECLARE v_sale_yn CHAR(1);
-    DECLARE v_contract_dt DATE;
-    DECLARE v_maturity_dt DATE;
-    DECLARE v_balance_after BIGINT;
-    DECLARE v_prod_tp VARCHAR(5);
-    DECLARE v_term_month INT;
-
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        SET p_depo_contract_id = NULL;
-    END;
-
-    SET v_contract_dt = CURRENT_DATE();
-
-    START TRANSACTION;
-
-    -- 1. 상품 + 조건 + 기본 금리 조회
-    SELECT dp.depo_prod_tp
-         , dp.depo_sale_yn
-         , dt.depo_min_amt
-         , dt.depo_max_amt
-         , dt.depo_term_month
-         , br.base_rt
-      INTO v_prod_tp
-         , v_sale_yn
-         , v_min_amt
-         , v_max_amt
-         , v_term_month
-         , v_depo_rt
-      FROM depo_prod dp
-      JOIN depo_prod_term dt
-        ON dp.depo_prod_id = dt.depo_prod_id
-      JOIN base_rate br
-        ON dp.depo_prod_id = br.depo_prod_id
-     WHERE dp.depo_prod_id = p_depo_prod_id
-     FOR UPDATE;
-
-    -- 2. 판매중 여부
-    IF v_sale_yn <> 'Y' THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = '판매 중지 상품';
-    END IF;
-
-    -- 3. 상품 타입이 "정기 적금"인지 체크 (코드는 네가 쓰는 걸로)
-    IF v_prod_tp <> 'DO003' THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = '정기 적금 상품이 아님';
-    END IF;
-
-    -- 4. 월 납입액이 최소/최대 범위 안인지
-    IF p_monthly_amt < v_min_amt OR p_monthly_amt > v_max_amt THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = '월 납입액 범위 초과';
-    END IF;
-
-    -- 5. 결제 계좌에서 첫 회차 납입 출금 (현금이면 스킵)
-    IF p_base_acct_id IS NOT NULL THEN
-        CALL sp_validate_account_owner(
-              p_base_acct_id,
-              p_cust_id
-        );
-
-        CALL sp_account_debit(
-              p_base_acct_id,
-              p_monthly_amt,
-              v_balance_after
-        );
-
-        CALL sp_insert_tran_history(
-              p_base_acct_id,
-              2,  -- 출금
-              p_monthly_amt,
-              v_balance_after,
-              '정기적금 1회차 납입 출금'
-        );
-    END IF;
-
-    -- 6. 만기일 = 계약일 + 상품 기간(개월)
-    SET v_maturity_dt = DATE_ADD(v_contract_dt, INTERVAL v_term_month MONTH);
-
-    -- 7. 예적금 공통 계약(depo_contract) INSERT
-    INSERT INTO depo_contract (
-          cust_id
-        , depo_prod_id
-        , acct_id
-        , depo_base_acct_id
-        , emp_id
-        , depo_contract_dt
-        , depo_maturity_dt
-        , depo_applied_intrst_rt
-        , depo_active_cd
-    ) VALUES (
-          p_cust_id
-        , p_depo_prod_id
-        , p_acct_id
-        , p_base_acct_id
-        , p_emp_id
-        , v_contract_dt
-        , v_maturity_dt
-        , v_depo_rt
-        , 'CS001'
-    );
-
-    SET p_depo_contract_id = LAST_INSERT_ID();
-
-    -- 8. 적금 계약 상세(depo_contract_savings) INSERT
-    INSERT INTO depo_contract_savings (
-          depo_contract_id
-        , depo_missed_cnt
-        , depo_payment_day
-        , depo_monthly_amt
-    ) VALUES (
-          p_depo_contract_id
-        , 0                -- 미납 횟수 초기값
-        , p_payment_day    -- 매달 납입일(1~28)
-        , p_monthly_amt
-    );
-
-    -- 9. 첫 회차 납입 내역(depo_savings_payment) INSERT
-    INSERT INTO depo_savings_payment (
-          depo_contract_id
-        , depo_pay_dt
-        , depo_pay_amt
-        , depo_payment_yn
-    ) VALUES (
-          p_depo_contract_id
-        , v_contract_dt
-        , p_monthly_amt
-        , CASE WHEN p_base_acct_id IS NOT NULL THEN 'Y' ELSE 'Y' END
-          -- 지금은 계약 시점에 무조건 납입했다고 가정
-    );
-
-    COMMIT;
-END $$
-
-DELIMITER ;
+UPDATE depo_contract d JOIN depo_prod p ON p.depo_prod_id = d.depo_prod_id LEFT JOIN (SELECT cust_id, MIN(acct_id) AS base_acct_id
+                                                                                      FROM account
+                                                                                      WHERE acct_is_ded_yn = 'Y'
+                                                                                      GROUP BY cust_id) a ON a.cust_id = d.cust_id
+SET d.depo_base_acct_id = a.base_acct_id
+WHERE d.depo_base_acct_id IS NULL
+  AND p.depo_prod_tp != 'DO001';
