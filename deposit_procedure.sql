@@ -63,7 +63,7 @@ END;
 CREATE PROCEDURE sp_insert_tran_history(
     IN p_acct_id BIGINT
 , IN p_amt BIGINT
-, in p_acct_num varchar(20)
+, IN p_acct_num VARCHAR(20)
 , IN p_bal BIGINT
 , IN p_trns_tp TINYINT
 , IN p_des VARCHAR(30)
@@ -91,7 +91,7 @@ END;
 CREATE PROCEDURE sp_open_savings_contract(
     IN p_cust_id BIGINT
 , IN p_depo_prod_id BIGINT
-, IN p_acct_num varchar(20) -- 생성할 계좌 번호
+, IN p_acct_num VARCHAR(20) -- 생성할 계좌 번호
 , IN p_base_acct_id BIGINT -- 결제 계좌(요구불), 현금이면 NULL
 , IN p_monthly_amt BIGINT -- 월 납입액
 , IN p_emp_id BIGINT
@@ -232,52 +232,5 @@ END $$
 
 DELIMITER ;
 
--- 예적금 계약 테이블 인서트 트리거(계약서 보관 테이블)
-DELIMITER $$
-
-CREATE TRIGGER ai_depo_contract_document
-    AFTER INSERT
-    ON depo_contract
-    FOR EACH ROW
-BEGIN
-    DECLARE v_bran_id BIGINT;
-    declare v_prod_tp varchar(5);
-    declare v_doc_nm varchar(20);
-
-    -- NEW.emp_id 기준으로 직원 테이블에서 지점 ID 조회
-    SELECT e.bran_id
-    INTO v_bran_id
-    FROM employees e
-    WHERE e.emp_id = NEW.emp_id;
-
-    -- 상품 타입에 따른 계약 문서 명 저장
-    select p.depo_prod_tp
-    into v_prod_tp
-    from depo_contract c
-    join depo_prod p
-    on c.depo_prod_id = p.depo_prod_id
-    where p.depo_prod_id - NEW.depo_prod_id;
-
-    if v_prod_tp = 'DO001' then
-        set v_doc_nm = '요구불 계약 문서';
-    else if v_prod_tp = 'DO002' then
-        set v_doc_nm = '정기 예금 계약 문서';
-    else if v_prod_tp = 'DO003' then
-        set v_doc_nm = '정기 적금 계약 문서';
-    else if v_prod_tp = 'DO004' then
-        set v_doc_nm = '자유 적금 계약 문서';
-    end if;
 
 
-    INSERT INTO prod_document (bran_id,
-                               doc_prod_tp,
-                               doc_prod_id,
-                               doc_nm)
-    VALUES (NEW.depo_contract_id,
-            v_bran_id,
-            'PD001',
-            ,
-            NOW());
-END$$
-
-DELIMITER ;
