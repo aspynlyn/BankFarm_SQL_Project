@@ -142,6 +142,8 @@ INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_
 INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO032','TRANSFER','지정 계좌 이체','지급 방식', CURRENT_TIMESTAMP);
 INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO033','AUTO_RENEW_PI','자동 재예치(원리금)','지급 방식', CURRENT_TIMESTAMP);
 INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO034','AUTO_RENEW_P','자동 재예치(원금)','지급 방식', CURRENT_TIMESTAMP);
+INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO036','TERMINATED','해지','해지/만기 유형', CURRENT_TIMESTAMP);
+INSERT INTO cd_common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_category_nm, cc_crt_at) VALUES ('DO','DO037','EXPIRED','만기','해지/만기 유형', CURRENT_TIMESTAMP);
 
 
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) VALUES ('CS','CS001','EFFECTIVE','유효', CURRENT_TIMESTAMP);
@@ -190,3 +192,4 @@ INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) 
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) VALUES ('BK','BK018','BUSAN','부산은행', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) VALUES ('BK','BK019','KYUNGNAM','경남은행', CURRENT_TIMESTAMP);
 INSERT INTO common_code(sc_cd_id, cc_cd_id, cc_cd_nm, cc_cd_des, cc_created_at) VALUES ('BK','BK020','JEONBUK','전북은행', CURRENT_TIMESTAMP);
+

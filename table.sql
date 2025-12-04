@@ -59,7 +59,7 @@ CREATE TABLE depo_contract
     acct_id                BIGINT     NOT NULL COMMENT '생성된 계좌 ID',
     depo_base_acct_id      BIGINT COMMENT '예치/납입/지급 시의 요구불 계좌',
     emp_id                 BIGINT     NOT NULL COMMENT '담당 직원 ID',
-    depo_contract_dt       DATE       NOT NULL DEFAULT CURRENT_DATE() COMMENT '가입 일자',
+    depo_contract_dt       DATE       NOT NULL COMMENT '가입 일자',
     depo_maturity_dt       DATE COMMENT '만기 일자',
     depo_applied_intrst_rt DECIMAL(6, 4) COMMENT '적용 금리',
     depo_active_cd         VARCHAR(5) NOT NULL DEFAULT 'CS001' COMMENT '계약 상태 코드',
@@ -103,9 +103,19 @@ CREATE TABLE depo_savings_payment
 (
     depo_payment_id  BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '납입 ID',
     depo_contract_id BIGINT  NOT NULL COMMENT '계약 ID',
-    depo_paid_dt     DATE    NOT NULL DEFAULT CURRENT_DATE() COMMENT '납입 일',
+    depo_paid_dt     DATE    NOT NULL COMMENT '납입 일',
     depo_paid_amt    BIGINT COMMENT '납입 액',
     depo_payment_yn  CHAR(1) NOT NULL COMMENT '납입 여부' CHECK ( depo_payment_yn IN ('Y', 'N') ),
+    FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
+);
+
+# 예적금 만지/해지 테이블
+CREATE TABLE depo_contract_term
+(
+    depo_contract_id BIGINT PRIMARY KEY COMMENT '계약 ID',
+    depo_term_tp     VARCHAR(5) NOT NULL COMMENT '해지/만기 유형',
+    depo_term_dt     DATE       NOT NULL COMMENT '해지/만기 일',
+    depo_term_reason VARCHAR(200) COMMENT '해지 사유',
     FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
 );
 
@@ -244,7 +254,7 @@ CREATE TABLE insr_term
 (
     insr_contract_id BIGINT PRIMARY KEY COMMENT '보험 계약 ID',
     insr_term_tp     VARCHAR(5) NOT NULL COMMENT '해지/만기 타입',
-    insr_term_dt     DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '해지/만기 일',
+    insr_term_dt     DATETIME   NOT NULL DEFAULT CURRENT_DATE() COMMENT '해지/만기 일',
     insr_term_reason VARCHAR(200) COMMENT '해지/만기 사유',
     FOREIGN KEY (insr_contract_id) REFERENCES insr_contract (insr_contract_id)
 );
