@@ -108,3 +108,7 @@ UPDATE depo_contract d JOIN depo_prod p ON p.depo_prod_id = d.depo_prod_id LEFT 
 SET d.depo_base_acct_id = a.base_acct_id
 WHERE d.depo_base_acct_id IS NULL
   AND p.depo_prod_tp != 'DO001';
+
+update depo_prod
+set depo_intrst_calc_tp = 'DO026'
+where depo_prod_tp = 'DO001';

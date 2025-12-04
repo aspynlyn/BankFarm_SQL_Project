@@ -147,19 +147,19 @@ BEGIN
 
     IF new.depo_payment_yn = 'Y' AND v_cash_yn = 'N' THEN
 
-        -- 예치금 납입 계좌 번호, 잔액 조회
+        -- 적금 납입 계좌 번호, 잔액 조회
         SELECT acct_num, acct_bal
         INTO v_base_acct_num, v_base_acct_bal
         FROM account
         WHERE acct_id = v_base_acct_id;
 
-        -- 예금 계약 계좌 번호, 잔액 조회
+        -- 적금 계약 계좌 번호, 잔액 조회
         SELECT acct_num, acct_bal
         INTO v_contract_acct_num, v_contract_acct_bal
         FROM account
         WHERE acct_id = v_contract_acct_id;
 
-        -- 납입 계좌 -> 예금 계좌 출금 내역 넣기
+        -- 납입 계좌 -> 적금 계좌 출금 내역 넣기
         INSERT INTO transaction(acct_id,
                                 trns_fee_id,
                                 trns_amt,
@@ -175,7 +175,7 @@ BEGIN
                 2,
                 '적금 납입');
 
-        -- 예금 계좌 입금 내역 넣기
+        -- 적금 계좌 입금 내역 넣기
         INSERT INTO transaction(acct_id,
                                 trns_fee_id,
                                 trns_amt,
@@ -223,19 +223,19 @@ BEGIN
        new.depo_payment_yn = 'Y' AND
        v_cash_yn = 'N' THEN
 
-        -- 예치금 납입 계좌 번호, 잔액 조회
+        -- 적금 납입 계좌 번호, 잔액 조회
         SELECT acct_num, acct_bal
         INTO v_base_acct_num, v_base_acct_bal
         FROM account
         WHERE acct_id = v_base_acct_id;
 
-        -- 예금 계약 계좌 번호, 잔액 조회
+        -- 적금 계약 계좌 번호, 잔액 조회
         SELECT acct_num, acct_bal
         INTO v_contract_acct_num, v_contract_acct_bal
         FROM account
         WHERE acct_id = v_contract_acct_id;
 
-        -- 납입 계좌 -> 예금 계좌 출금 내역 넣기
+        -- 납입 계좌 -> 적금 계좌 출금 내역 넣기
         INSERT INTO transaction(acct_id,
                                 trns_fee_id,
                                 trns_amt,
@@ -251,7 +251,7 @@ BEGIN
                 2,
                 '적금 납입');
 
-        -- 예금 계좌 입금 내역 넣기
+        -- 적금 계좌 입금 내역 넣기
         INSERT INTO transaction(acct_id,
                                 trns_fee_id,
                                 trns_amt,

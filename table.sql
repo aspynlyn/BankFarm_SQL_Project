@@ -98,13 +98,12 @@ CREATE TABLE depo_contract_savings
     FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
 );
 
-
 # 적금 납입 내역 테이블
 CREATE TABLE depo_savings_payment
 (
     depo_payment_id  BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '납입 ID',
     depo_contract_id BIGINT  NOT NULL COMMENT '계약 ID',
-    depo_paid_dt     DATE    NOT NULL COMMENT '납입 일',
+    depo_paid_dt     DATE    NOT NULL DEFAULT CURRENT_DATE() COMMENT '납입 일',
     depo_paid_amt    BIGINT COMMENT '납입 액',
     depo_payment_yn  CHAR(1) NOT NULL COMMENT '납입 여부' CHECK ( depo_payment_yn IN ('Y', 'N') ),
     FOREIGN KEY (depo_contract_id) REFERENCES depo_contract (depo_contract_id)
