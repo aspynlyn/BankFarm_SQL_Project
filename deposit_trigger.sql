@@ -56,6 +56,7 @@ CREATE TRIGGER trg_insert_depo_contract_deposit
 
 BEGIN
 
+    DECLARE v_cash_yn CHAR(1);
     DECLARE v_base_acct_id BIGINT;
     DECLARE v_base_acct_num VARCHAR(20);
     DECLARE v_base_acct_bal BIGINT;
@@ -63,55 +64,58 @@ BEGIN
     DECLARE v_contract_acct_num VARCHAR(20);
     DECLARE v_contract_acct_bal BIGINT;
 
-    -- 계약한 계좌 pk, 납입 한 계좌 pk 조회
-    SELECT acct_id, depo_base_acct_id
-    INTO v_contract_acct_id,v_base_acct_id
+    -- 현금 납입 여부, 계약한 계좌 pk, 납입 한 계좌 pk 조회
+    SELECT depo_paid_cash_yn, acct_id, depo_base_acct_id
+    INTO v_cash_yn, v_contract_acct_id, v_base_acct_id
     FROM depo_contract
-    WHERE depo_contract_id = new.depo_contract_id;
+    WHERE depo_contract_id = NEW.depo_contract_id;
 
-    -- 예치금 납입 계좌 번호, 잔액 조회
-    SELECT acct_num, acct_bal
-    INTO v_base_acct_num, v_base_acct_bal
-    FROM account
-    WHERE acct_id = v_base_acct_id;
+    IF v_cash_yn = 'N' THEN
 
-    -- 예금 계약 계좌 번호, 잔액 조회
-    SELECT acct_num, acct_bal
-    INTO v_contract_acct_num, v_contract_acct_bal
-    FROM account
-    WHERE acct_id = v_contract_acct_id;
+        -- 예치금 납입 계좌 번호, 잔액 조회
+        SELECT acct_num, acct_bal
+        INTO v_base_acct_num, v_base_acct_bal
+        FROM account
+        WHERE acct_id = v_base_acct_id;
 
-    -- 납입 계좌 -> 예금 계좌 출금 내역 넣기
-    INSERT INTO transaction(acct_id,
-                            trns_fee_id,
-                            trns_amt,
-                            trns_acct_num,
-                            trns_bal,
-                            trns_tp,
-                            trns_des)
-    VALUES (v_base_acct_id,
-            1,
-            -new.depo_prncp_amt,
-            v_contract_acct_num,
-            v_base_acct_bal - new.depo_prncp_amt,
-            2,
-            '예치금 납입');
+        -- 예금 계약 계좌 번호, 잔액 조회
+        SELECT acct_num, acct_bal
+        INTO v_contract_acct_num, v_contract_acct_bal
+        FROM account
+        WHERE acct_id = v_contract_acct_id;
 
-    -- 예금 계좌 입금 내역 넣기
-    INSERT INTO transaction(acct_id,
-                            trns_fee_id,
-                            trns_amt,
-                            trns_acct_num,
-                            trns_bal,
-                            trns_tp,
-                            trns_des)
-    VALUES (v_contract_acct_id,
-            1,
-            new.depo_prncp_amt,
-            v_base_acct_num,
-            v_contract_acct_bal + new.depo_prncp_amt,
-            1,
-            '예치금 납입');
+        -- 납입 계좌 -> 예금 계좌 출금 내역 넣기
+        INSERT INTO transaction(acct_id,
+                                trns_fee_id,
+                                trns_amt,
+                                trns_acct_num,
+                                trns_bal,
+                                trns_tp,
+                                trns_des)
+        VALUES (v_base_acct_id,
+                1,
+                -new.depo_prncp_amt,
+                v_contract_acct_num,
+                v_base_acct_bal - new.depo_prncp_amt,
+                2,
+                '예치금 납입');
+
+        -- 예금 계좌 입금 내역 넣기
+        INSERT INTO transaction(acct_id,
+                                trns_fee_id,
+                                trns_amt,
+                                trns_acct_num,
+                                trns_bal,
+                                trns_tp,
+                                trns_des)
+        VALUES (v_contract_acct_id,
+                1,
+                new.depo_prncp_amt,
+                v_base_acct_num,
+                v_contract_acct_bal + new.depo_prncp_amt,
+                1,
+                '예치금 납입');
+    END IF;
 
 END$$
 
@@ -127,6 +131,7 @@ CREATE TRIGGER trg_insert_depo_savings_payment
 
 BEGIN
 
+    DECLARE v_cash_yn CHAR(1);
     DECLARE v_base_acct_id BIGINT;
     DECLARE v_base_acct_num VARCHAR(20);
     DECLARE v_base_acct_bal BIGINT;
@@ -134,12 +139,13 @@ BEGIN
     DECLARE v_contract_acct_num VARCHAR(20);
     DECLARE v_contract_acct_bal BIGINT;
 
-    IF new.depo_payment_yn = 'Y' THEN
-        -- 계약한 계좌 pk, 납입 한 계좌 pk 조회
-        SELECT acct_id, depo_base_acct_id
-        INTO v_contract_acct_id,v_base_acct_id
-        FROM depo_contract
-        WHERE depo_contract_id = new.depo_contract_id;
+    -- 현금 납입 여부, 계약한 계좌 pk, 납입 한 계좌 pk 조회
+    SELECT depo_paid_cash_yn, acct_id, depo_base_acct_id
+    INTO v_cash_yn, v_contract_acct_id, v_base_acct_id
+    FROM depo_contract
+    WHERE depo_contract_id = NEW.depo_contract_id;
+
+    IF new.depo_payment_yn = 'Y' AND v_cash_yn = 'N' THEN
 
         -- 예치금 납입 계좌 번호, 잔액 조회
         SELECT acct_num, acct_bal
@@ -192,13 +198,14 @@ DELIMITER ;
 -- 적금 납입(정기) 테이블 업데이트 트리거(입출금 테이블)
 DELIMITER $$
 
-CREATE TRIGGER trg_insert_depo_savings_payment
-    AFTER INSERT
+CREATE TRIGGER trg_update_depo_savings_payment
+    AFTER UPDATE
     ON depo_savings_payment
     FOR EACH ROW
 
 BEGIN
 
+    DECLARE v_cash_yn CHAR(1);
     DECLARE v_base_acct_id BIGINT;
     DECLARE v_base_acct_num VARCHAR(20);
     DECLARE v_base_acct_bal BIGINT;
@@ -206,13 +213,15 @@ BEGIN
     DECLARE v_contract_acct_num VARCHAR(20);
     DECLARE v_contract_acct_bal BIGINT;
 
+    -- 현금 납입 여부, 계약한 계좌 pk, 납입 한 계좌 pk 조회
+    SELECT depo_paid_cash_yn, acct_id, depo_base_acct_id
+    INTO v_cash_yn, v_contract_acct_id, v_base_acct_id
+    FROM depo_contract
+    WHERE depo_contract_id = NEW.depo_contract_id;
+
     IF old.depo_payment_yn != 'Y' AND
-       new.depo_payment_yn = 'Y' THEN
-        -- 계약한 계좌 pk, 납입 한 계좌 pk 조회
-        SELECT acct_id, depo_base_acct_id
-        INTO v_contract_acct_id,v_base_acct_id
-        FROM depo_contract
-        WHERE depo_contract_id = new.depo_contract_id;
+       new.depo_payment_yn = 'Y' AND
+       v_cash_yn = 'N' THEN
 
         -- 예치금 납입 계좌 번호, 잔액 조회
         SELECT acct_num, acct_bal
@@ -261,5 +270,3 @@ BEGIN
 END$$
 
 DELIMITER ;
-
--- 현금 납입인 예적금 계약 분기 처리 로직 추가하기...

@@ -1,5 +1,5 @@
 -- 계좌 상태 확인 및 고객 일치 확인 프로시저
-CREATE PROCEDURE sp_validate_account_owner(
+CREATE PROCEDURE proc_depo_account_owner(
     IN p_acct_id BIGINT
 , IN p_cust_id BIGINT
 )
@@ -15,23 +15,23 @@ BEGIN
     UPDATE;
 
     IF v_status = 'AS002' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 비활성화 상태';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌가 비활성화 상태입니다.';
     END IF;
 
     IF v_status = 'AS003' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 휴면 상태';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌가 휴면 상태입니다.';
     END IF;
 
     IF v_status = 'AS004' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 법적 동결 상태';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌가 법적 동결 상태입니다.';
     END IF;
 
     IF v_status = 'AS005' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '해지된 계좌';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '해지된 계좌입니다.';
     END IF;
 
     IF v_cust_id != p_cust_id THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계약 고객과 계좌 소유자 불일치';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계약 고객과 계좌 소유자가 일치하지 않습니다.';
     END IF;
 
 END;
@@ -39,7 +39,7 @@ END;
 DELIMITER $$
 
 -- 계좌 잔액 확인(출금용) 프로시저
-CREATE PROCEDURE sp_account_debit(
+CREATE PROCEDURE proc_depo_account_debit(
     IN p_acct_id BIGINT
 , IN p_amt BIGINT
 )
@@ -54,183 +54,233 @@ BEGIN
     UPDATE;
 
     IF v_bal < p_amt THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '잔액 부족';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '잔액이 부족합니다.';
     END IF;
 
 END;
 
--- 입출금 내역 인서트 프로시저
-CREATE PROCEDURE sp_insert_tran_history(
-    IN p_acct_id BIGINT
-, IN p_amt BIGINT
-, IN p_acct_num VARCHAR(20)
-, IN p_bal BIGINT
-, IN p_trns_tp TINYINT
-, IN p_des VARCHAR(30)
-)
-BEGIN
-    INSERT INTO transaction ( acct_id
-                            , trns_fee_id
-                            , trns_amt
-                            , trns_acct_num
-                            , trns_bal
-                            , trns_tp
-                            , trns_crt_at
-                            , trns_des)
-    VALUES ( p_acct_id
-           , 0
-           , p_amt
-           , p_acct_num
-           , p_bal
-           , p_trns_tp
-           , NOW()
-           , p_des);
-END;
+-- 에적금 계약 메인 엔트리(예적금/요구불 계약 + 계좌 생성 공통 처리)
 
--- 적금 계약 프로시저
-CREATE PROCEDURE sp_open_savings_contract(
-    IN p_cust_id BIGINT
-, IN p_depo_prod_id BIGINT
-, IN p_acct_num VARCHAR(20) -- 생성할 계좌 번호
-, IN p_base_acct_id BIGINT -- 결제 계좌(요구불), 현금이면 NULL
-, IN p_monthly_amt BIGINT -- 월 납입액
-, IN p_emp_id BIGINT
-, IN p_payment_day TINYINT -- 1~28
-, OUT p_depo_contract_id BIGINT
+DELIMITER $$
+
+CREATE PROCEDURE proc_depo_open_contract(
+    IN p_cust_id BIGINT, -- 계약 고객 ID
+    IN p_depo_prod_id BIGINT, -- 예적금/요구불 상품 ID
+    IN p_emp_id BIGINT, -- 담당 직원 ID
+    IN p_acct_pw VARCHAR(64), -- 계좌 비밀번호(암호화 후)
+    IN p_acct_day_limit BIGINT, -- 일일 출금 한도
+    IN p_depo_prncp_amt BIGINT, -- 예치/납입 금
+    IN p_depo_paid_cash_yn CHAR(1), -- 현금 납입 계약 여부(Y/N)
+    IN p_base_acct_id BIGINT, -- 출금 계좌 ID (현금이면 NULL 허용)
+    in p_intrst_rt DECIMAL(6,4), -- 적용 금리(고객마다 다름 백에서 계산 한 값)
+    in p_payment_day TINYINT, -- 납입일(정기 적금만 해당)
+    OUT o_depo_contract_id BIGINT, -- 생성된 계약 ID
+    OUT o_contract_acct_id BIGINT, -- 생성된 계좌 ID
+    OUT o_contract_acct_num VARCHAR(20) -- 생성된 계약 계좌번호
 )
 BEGIN
-    DECLARE v_min_amt INT;
-    DECLARE v_max_amt INT;
-    DECLARE v_depo_rt DECIMAL(6, 4);
     DECLARE v_sale_yn CHAR(1);
-    DECLARE v_contract_dt DATE;
-    DECLARE v_maturity_dt DATE;
-    DECLARE v_balance_after BIGINT;
     DECLARE v_prod_tp VARCHAR(5);
-    DECLARE v_term_month INT;
+    DECLARE v_min_amt BIGINT;
+    DECLARE v_max_amt BIGINT;
+    DECLARE v_contract_acct_id BIGINT;
+    DECLARE v_contract_acct_num VARCHAR(20);
+    DECLARE v_contract_acct_tp VARCHAR(5);
+    DECLARE v_contract_ded_yn CHAR(1);
+    DECLARE v_term_month int;
+    DECLARE v_maturity_dt date;
+    DECLARE v_payout_tp VARCHAR(5);
+    DECLARE v_exists_cnt INT DEFAULT 0;
+    DECLARE v_prefix7 VARCHAR(7);
+    DECLARE v_mid2 VARCHAR(2);
+    DECLARE v_suffix5 VARCHAR(5);
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-        BEGIN
-            ROLLBACK;
-            SET p_depo_contract_id = NULL;
-        END;
+    -- 1. 상품 활성화 여부 조회
+    SELECT depo_sale_yn, depo_prod_tp
+    INTO v_sale_yn, v_prod_tp
+    FROM depo_prod
+    WHERE depo_prod_id = p_depo_prod_id;
 
-    SET v_contract_dt = CURRENT_DATE();
-
-    START TRANSACTION;
-
-    -- 1. 상품 + 조건 + 기본 금리 조회
-    SELECT dp.depo_prod_tp
-         , dp.depo_sale_yn
-         , dt.depo_min_amt
-         , dt.depo_max_amt
-         , dt.depo_term_month
-         , br.base_rt
-    INTO v_prod_tp
-        , v_sale_yn
-        , v_min_amt
-        , v_max_amt
-        , v_term_month
-        , v_depo_rt
-    FROM depo_prod dp
-             JOIN depo_prod_term dt
-                  ON dp.depo_prod_id = dt.depo_prod_id
-             JOIN base_rate br
-                  ON dp.depo_prod_id = br.depo_prod_id
-    WHERE dp.depo_prod_id = p_depo_prod_id
-        FOR
-    UPDATE;
-
-    -- 2. 판매중 여부
-    IF v_sale_yn <> 'Y' THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = '판매 중지 상품';
+    -- 상품 존재 여부 체크
+    IF v_sale_yn = 'N' THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '판매하지 않는 예적금/요구불 상품입니다.';
     END IF;
 
-    -- 3. 상품 타입이 "정기 적금"인지 체크 (코드는 네가 쓰는 걸로)
-    IF v_prod_tp <> 'DO003' THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = '정기 적금 상품이 아님';
+    -- 현금 납입 여부 값 체크
+    IF p_depo_paid_cash_yn NOT IN ('Y', 'N') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '현금 납입 여부 값이 잘못되었습니다. (Y/N)';
     END IF;
 
-    -- 4. 월 납입액이 최소/최대 범위 안인지
-    IF p_monthly_amt < v_min_amt OR p_monthly_amt > v_max_amt THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = '월 납입액 범위 초과';
+    -- 계좌에서 출금하는 계약인데 출금 계좌가 없으면 에러
+    IF p_depo_paid_cash_yn = 'N' AND p_base_acct_id IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 납입인데 출금 계좌 ID가 없습니다.';
     END IF;
 
-    -- 5. 결제 계좌에서 첫 회차 납입 출금 (현금이면 스킵)
-    IF p_base_acct_id IS NOT NULL THEN
-        CALL sp_validate_account_owner(
-                p_base_acct_id,
-                p_cust_id
-             );
-
-        CALL sp_account_debit(
-                p_base_acct_id,
-                p_monthly_amt,
-                v_balance_after
-             );
-
-        CALL sp_insert_tran_history(
-                p_base_acct_id,
-                2, -- 출금
-                p_monthly_amt,
-                v_balance_after,
-                '정기적금 1회차 납입 출금'
-             );
+    -- 예치/납입 금액 기본 검증
+    IF p_depo_prncp_amt <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '예치/납입 금액이 잘못되었습니다.';
     END IF;
 
-    -- 6. 만기일 = 계약일 + 상품 기간(개월)
-    SET v_maturity_dt = DATE_ADD(v_contract_dt, INTERVAL v_term_month MONTH);
+    -- 최대, 최소 예치 금액 검증(요구불 제외)
+    IF v_prod_tp IN ('DO002', 'DO003', 'DO004') THEN
 
-    -- 7. 예적금 공통 계약(depo_contract) INSERT
+        -- 상품 상세 테이블에서 min/max만 세부 조회
+        SELECT depo_min_amt, depo_max_amt
+          INTO v_min_amt, v_max_amt
+          FROM depo_prod_term
+         WHERE depo_prod_id = p_depo_prod_id;
+
+        IF v_min_amt IS NULL AND v_max_amt IS NULL THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = '해당 상품에 대한 금액 제한 정보가 없습니다';
+        END IF;
+
+        IF p_depo_prncp_amt < v_min_amt THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = '상품 최소 가입 금액을 미달했습니다.';
+        END IF;
+
+        -- 최대 금액 초과 체크 (최대 금액이 NULL이면 “상한 없음” → 체크 스킵)
+        IF v_max_amt IS NOT NULL
+           AND p_depo_prncp_amt > v_max_amt THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = '상품 최대 가입 금액을 초과했습니다.';
+        END IF;
+
+END IF;
+
+    -- 2. 출금 계좌 검증 (현금 납입이 아닐 때만)
+    IF p_depo_paid_cash_yn = 'N' THEN
+        -- 계좌 상태/소유자 확인
+        CALL proc_depo_account_owner(p_base_acct_id, p_cust_id);
+        -- 잔액 확인 (최초 예치/납입 금액 기준)
+        CALL proc_depo_account_debit(p_base_acct_id, p_depo_prncp_amt);
+    END IF;
+
+    -- 3. 계약 계좌(account)생성
+    -- 3-1. 계좌번호 생성
+    account_num_loop:
+    WHILE TRUE
+        DO
+            SET v_prefix7 = LPAD(FLOOR(RAND() * 10000000), 7, '0'); -- 0000000 ~ 9999999
+            SET v_mid2 = LPAD(FLOOR(RAND() * 100), 2, '0'); -- 00 ~ 99
+            SET v_suffix5 = LPAD(FLOOR(RAND() * 100000), 5, '0'); -- 00000 ~ 99999
+
+            SET v_contract_acct_num = CONCAT(v_prefix7, '-', v_mid2, '-', v_suffix5);
+
+            -- 중복 체크
+            SELECT COUNT(*)
+            INTO v_exists_cnt
+            FROM account
+            WHERE acct_num = v_contract_acct_num;
+
+            IF v_exists_cnt = 0 THEN
+                LEAVE account_num_loop;
+            END IF;
+        END WHILE account_num_loop;
+
+    -- 3-2. 계약 상품 타입에 따른 이체 타입, 요구불 여부, 만기일, 지급 방식 지정
+    IF v_prod_tp = 'DO001' THEN
+        SET v_contract_acct_tp = 'AC001';
+        SET v_contract_ded_yn = 'Y';
+        set v_maturity_dt = null;
+        set v_payout_tp = null;
+    ELSE
+        SET v_contract_acct_tp = 'AC002';
+        SET v_contract_ded_yn = 'N';
+
+        SELECT depo_term_month
+        into v_term_month
+        from depo_prod_term
+        where depo_prod_id = p_depo_prod_id;
+
+        SET v_maturity_dt = DATE_ADD(current_date, INTERVAL v_term_month MONTH);
+
+        if p_depo_paid_cash_yn = 'Y' then
+            set v_payout_tp = 'DO031';
+        elseif p_depo_paid_cash_yn = 'N' then
+            set v_payout_tp = 'DO032';
+        END IF;
+
+    END IF;
+
+    -- 3-3. 계좌 테이블 인서트
+    INSERT INTO account ( cust_id
+                        , acct_sav_tp
+                        , acct_num
+                        , acct_pw
+                        , acct_day_limit
+                        , acct_sts_cd
+                        , acct_is_ded_yn)
+    VALUES ( p_cust_id
+           , v_contract_acct_tp
+           , v_contract_acct_num
+           , p_acct_pw
+           , p_acct_day_limit
+           , 'AS001'
+           , v_contract_ded_yn
+           );
+
+    SET v_contract_acct_id = LAST_INSERT_ID();
+
+    -- 5. 예적금/요구불 계약 INSERT
     INSERT INTO depo_contract ( cust_id
                               , depo_prod_id
                               , acct_id
                               , depo_base_acct_id
                               , emp_id
-                              , depo_contract_dt
                               , depo_maturity_dt
                               , depo_applied_intrst_rt
-                              , depo_active_cd)
-    VALUES ( p_cust_id
+                              , depo_payout_tp
+                              , depo_paid_cash_yn)
+    VALUES (p_cust_id
            , p_depo_prod_id
-           , p_acct_id
+           , v_contract_acct_id
            , p_base_acct_id
            , p_emp_id
-           , v_contract_dt
            , v_maturity_dt
-           , v_depo_rt
-           , 'CS001');
+           , p_intrst_rt
+           , v_payout_tp
+           , p_depo_paid_cash_yn);
 
-    SET p_depo_contract_id = LAST_INSERT_ID();
+    SET o_depo_contract_id = LAST_INSERT_ID();
+    SET o_contract_acct_id = v_contract_acct_id;
+    SET o_contract_acct_num = v_contract_acct_num;
 
-    -- 8. 적금 계약 상세(depo_contract_savings) INSERT
-    INSERT INTO depo_contract_savings ( depo_contract_id
-                                      , depo_missed_cnt
-                                      , depo_payment_day
-                                      , depo_monthly_amt)
-    VALUES ( p_depo_contract_id
-           , 0 -- 미납 횟수 초기값
-           , p_payment_day -- 매달 납입일(1~28)
-           , p_monthly_amt);
+    -- 6. 상품 타입별 후속 처리: 서브 프로시저로 분리
 
-    -- 9. 첫 회차 납입 내역(depo_savings_payment) INSERT
-    INSERT INTO depo_savings_payment ( depo_contract_id
-                                     , depo_pay_dt
-                                     , depo_pay_amt
-                                     , depo_payment_yn)
-    VALUES ( p_depo_contract_id
-           , v_contract_dt
-           , p_monthly_amt
-           , CASE WHEN p_base_acct_id IS NOT NULL THEN 'Y' ELSE 'Y' END
-               -- 지금은 계약 시점에 무조건 납입했다고 가정
-           );
-    COMMIT;
-END $$
+    IF v_prod_tp = 'DO002' THEN
+        INSERT INTO depo_contract_deposit (
+            depo_contract_id
+            , depo_prncp_amt
+        )
+        VALUES (
+            o_depo_contract_id
+            , p_depo_prncp_amt
+        );
+    ELSEIF v_prod_tp in ('DO003', 'DO004') THEN
+        if v_prod_tp = 'DO004' then
+            INSERT INTO depo_contract_savings (
+                depo_contract_id
+                , depo_payment_day
+                , depo_monthly_amt
+            )
+            VALUES (
+                o_depo_contract_id
+                , p_payment_day
+                , p_depo_prncp_amt
+            );
+        end if;
+
+    END IF;
+
+END$$
 
 DELIMITER ;
 
+-- 적금 납입 내역 프로시저
+DELIMITER $$
 
+CREATE PROCEDURE proc_depo_savings_payment(
 
+)
