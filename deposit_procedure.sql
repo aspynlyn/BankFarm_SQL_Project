@@ -238,7 +238,7 @@ BEGIN
            , v_contract_acct_id
            , p_base_acct_id
            , p_emp_id
-           ,
+           , v_contract_dt
            , v_maturity_dt
            , p_intrst_rt
            , v_payout_tp
