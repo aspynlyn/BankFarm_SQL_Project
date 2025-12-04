@@ -401,7 +401,7 @@ BEGIN
         IF v_days < 0 THEN SET v_days = 0; END IF;
 
         SET o_principal = v_principal;
-        SET o_interest = FLOOR(v_principal * v_rate * (v_days / 365));
+        SET o_interest = FLOOR(v_principal * v_rate * v_days / 365);
 
 
     ELSEIF v_prod_tp IN ('DO003', 'DO004') THEN
@@ -418,8 +418,8 @@ BEGIN
                        SUM(
                                depo_paid_amt
                                    * v_rate
-                                   * (GREATEST(DATEDIFF(v_settle_dt, depo_paid_dt), 0)
-                                   / 365)
+                                   * GREATEST(DATEDIFF(v_settle_dt, depo_paid_dt), 0)
+                                   / 365
                        )
                    , 0)
         INTO v_sum_interest
@@ -458,6 +458,11 @@ BEGIN
     IF p_amt IS NULL OR p_amt <= 0 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = '이체 금액이 잘못되었습니다.';
+    END IF;
+
+    IF p_total_amt IS NULL OR p_total_amt <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = '총 이체 금액이 잘못되었습니다.';
     END IF;
 
     -- 출금 계좌 조회 (잔액, 계좌번호) + 잠금
@@ -530,17 +535,16 @@ BEGIN
                , v_from_num
                , v_to_bal + p_total_amt
                , 1
-               , '예적금 원금, 이자 입금');
+               , '예적금 원리금 입금');
     END IF;
 END$$
 
 DELIMITER ;
 
--- 만기/해지시 스케줄러로 호출할 정산 메인 프로시저
+-- 만기시 스케줄러로 호출할 정산 메인 프로시저
 DELIMITER $$
 
 CREATE PROCEDURE proc_depo_daily_maturity_settle(
-    IN p_call_tp CHAR(1)
 )
 BEGIN
     DECLARE v_settle_dt DATE;
@@ -554,16 +558,12 @@ BEGIN
 
     DECLARE v_principal BIGINT;
     DECLARE v_interest BIGINT;
-    DECLARE v_rate_used DECIMAL(6, 4);
     DECLARE v_total_pay BIGINT;
 
     DECLARE done INT DEFAULT 0;
 
-    SET v_settle_dt = CURRENT_DATE();
-
-    IF p_call_tp = 'M' THEN
-        -- 오늘 만기이면서 활성 상태인 계약 커서
-        DECLARE cur_maturity CURSOR FOR
+    -- 오늘 만기이면서 활성 상태인 계약 커서
+    DECLARE cur_maturity CURSOR FOR
         SELECT c.depo_contract_id
              , p.depo_prod_tp
              , c.depo_paid_cash_yn
@@ -576,40 +576,43 @@ BEGIN
         WHERE c.depo_maturity_dt = v_settle_dt
           AND c.depo_active_cd = 'CS001';
 
-        DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
 
-        OPEN cur_maturity;
+    SET v_settle_dt = CURRENT_DATE;
 
-        read_loop:
-        LOOP
-            FETCH cur_maturity
-                INTO v_contract_id
-                    , v_prod_tp
-                    , v_paid_cash_yn
-                    , v_contract_acct_id
-                    , v_base_acct_id
-                    , v_cust_id;
+    OPEN cur_maturity;
 
-            IF done = 1 THEN
-                LEAVE read_loop;
-            END IF;
+    read_loop:
+    LOOP
+        FETCH cur_maturity
+            INTO v_contract_id
+                , v_prod_tp
+                , v_paid_cash_yn
+                , v_contract_acct_id
+                , v_base_acct_id
+                , v_cust_id;
 
-            -- 정기예금/정기적금/자유적금만 처리
-            IF v_prod_tp NOT IN ('DO002', 'DO003', 'DO004') THEN
-                ITERATE read_loop;
-            END IF;
+        IF done = 1 THEN
+            LEAVE read_loop;
+        END IF;
 
-            -- 이자 계산 (만기 정산: p_settle_tp = 'M')
-            CALL proc_depo_calc_interest(
-                    v_contract_id
-                , 'M'
-                , v_principal
-                , v_interest
-                 );
+        -- 정기예금/정기적금/자유적금만 처리
+        IF v_prod_tp NOT IN ('DO002', 'DO003', 'DO004') THEN
+            ITERATE read_loop;
+        END IF;
 
-            SET v_total_pay = v_principal + v_interest;
+        -- 이자 계산 (만기 정산: p_settle_tp = 'M')
+        CALL proc_depo_calc_interest(
+                v_contract_id
+            , 'M'
+            , v_principal
+            , v_interest
+             );
 
-            -- 계좌 지급: 계약 계좌 → 기준 계좌(base_acct_id)로 원리금 이체
+        SET v_total_pay = v_principal + v_interest;
+
+        -- 계좌 지급: 계약 계좌 → 기준 계좌(base_acct_id)로 원리금 이체(혹시 모르니 현금 지급 아닌 계약만
+        IF v_paid_cash_yn = 'N' THEN
             CALL proc_depo_acct_transfer(
                     v_contract_acct_id
                 , v_base_acct_id
@@ -617,32 +620,147 @@ BEGIN
                 , v_total_pay
                 , v_cust_id
                  );
+        ELSE
+            CALL proc_depo_acct_transfer(
+                    v_contract_acct_id
+                , NULL
+                , v_principal
+                , v_total_pay
+                , v_cust_id
+                 );
+        END IF;
 
-            -- 계약 상태/정산 정보 업데이트
-            UPDATE depo_contract
-            SET depo_active_cd = 'CS002'
-            WHERE depo_contract_id = v_contract_id;
+        -- 계약 상태 업데이트
+        UPDATE depo_contract
+        SET depo_active_cd = 'CS002'
+        WHERE depo_contract_id = v_contract_id;
 
-            -- 만기 테이블에 인서트
-            INSERT INTO depo_contract_term(
-                  depo_contract_id
-                    , depo_term_tp
-                                          , depo_term_dt
-                )
-                VALUES (
-                        v_contract_id
-                    ,
-                       )
+        -- 계좌 상태 업데이트
+        UPDATE account
+        SET acct_sts_cd = 'AS002'
+        WHERE acct_id = v_contract_acct_id;
 
-        END LOOP;
+        -- 만기 테이블에 인서트
+        INSERT INTO depo_contract_term( depo_contract_id
+                                      , depo_term_tp
+                                      , depo_term_dt)
+        VALUES ( v_contract_id
+               , 'DO037'
+               , v_settle_dt);
+    END LOOP;
 
-        CLOSE cur_maturity;
-    ELSEIF p_call_tp = 'E' THEN
+    CLOSE cur_maturity;
 
-    END IF;
 
 END$$
 
 DELIMITER ;
 
--- 이자 지급하는 내부 계좌는 일단 없다고 치고 상품 계좌에서 지급 계좌로 돈 넣는 입출금 로직 찍기 그리고 계좌 상태, 계약 상태 바꾸고 만기해지 테이블에 데이터 찍기
+-- 예적금 해지시 정산 메인 프로시저
+DELIMITER $$
+
+CREATE PROCEDURE proc_depo_terminate_settle(
+    IN p_depo_contract_id BIGINT
+, IN p_depo_term_reason VARCHAR(200)
+)
+BEGIN
+    DECLARE v_contract_id BIGINT;
+    DECLARE v_prod_tp VARCHAR(5);
+    DECLARE v_paid_cash_yn CHAR(1);
+    DECLARE v_contract_acct_id BIGINT;
+    DECLARE v_base_acct_id BIGINT;
+    DECLARE v_cust_id BIGINT;
+
+    DECLARE v_principal BIGINT;
+    DECLARE v_interest BIGINT;
+    DECLARE v_total_pay BIGINT;
+
+    DECLARE v_settle_dt DATE;
+
+    IF p_depo_contract_id IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = '계약 ID가 없습니다.';
+    END IF;
+
+    -- 해지 대상 계약 조회
+    SELECT c.depo_contract_id
+         , p.depo_prod_tp
+         , c.depo_paid_cash_yn
+         , c.acct_id
+         , c.depo_base_acct_id
+         , c.cust_id
+    INTO v_contract_id
+        , v_prod_tp
+        , v_paid_cash_yn
+        , v_contract_acct_id
+        , v_base_acct_id
+        , v_cust_id
+    FROM depo_contract c
+             JOIN depo_prod p
+                  ON p.depo_prod_id = c.depo_prod_id
+    WHERE c.depo_contract_id = p_depo_contract_id
+      AND c.depo_active_cd = 'CS001'; -- 활성 상태만 해지 가능
+
+    IF v_contract_id IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = '해지 가능한 상태의 계약이 아닙니다.';
+    END IF;
+
+    IF v_prod_tp NOT IN ('DO002', 'DO003', 'DO004') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = '예적금 상품만 해지 가능합니다.';
+    END IF;
+
+    SET v_settle_dt = CURRENT_DATE;
+
+    -- 이자 계산 (해지 정산: p_settle_tp = 'E')
+    CALL proc_depo_calc_interest(
+            v_contract_id
+        , 'E'
+        , v_principal
+        , v_interest
+         );
+
+    SET v_total_pay = v_principal + v_interest;
+
+    -- 계좌 지급: 계약 계좌 → 기준 계좌(base_acct_id)로 원리금 이체(혹시 모르니 현금 지급 아닌 계약만
+    IF v_paid_cash_yn = 'N' THEN
+        CALL proc_depo_acct_transfer(
+                v_contract_acct_id
+            , v_base_acct_id
+            , v_principal
+            , v_total_pay
+            , v_cust_id
+             );
+    ELSE
+        CALL proc_depo_acct_transfer(
+                v_contract_acct_id
+            , NULL
+            , v_principal
+            , v_total_pay
+            , v_cust_id
+             );
+    END IF;
+
+    -- 계약 상태 업데이트
+    UPDATE depo_contract
+    SET depo_active_cd = 'CS003'
+    WHERE depo_contract_id = v_contract_id;
+
+    -- 계좌 상태 업데이트
+    UPDATE account
+    SET acct_sts_cd = 'AS005'
+    WHERE acct_id = v_contract_acct_id;
+
+    -- 만기 테이블에 인서트
+    INSERT INTO depo_contract_term( depo_contract_id
+                                  , depo_term_tp
+                                  , depo_term_dt
+                                  , depo_term_reason)
+    VALUES ( v_contract_id
+           , 'DO036'
+           , v_settle_dt
+           , p_depo_term_reason);
+END $$
+
+DELIMITER ;
