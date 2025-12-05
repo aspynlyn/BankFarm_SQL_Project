@@ -1,7 +1,7 @@
 -- 보험 계약 테이블 업데이트(보험사 승인 후) 트리거(계약서 보관 테이블)
 DELIMITER $$
 
-CREATE TRIGGER trg_insert_insr_contract
+CREATE TRIGGER trg_update_insr_contract
     AFTER UPDATE
     ON insr_contract
     FOR EACH ROW
