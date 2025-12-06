@@ -160,21 +160,32 @@ DROP TABLE fx_currency_exchange;
 CREATE TABLE fx_currency_exchange
 (
     fx_trns_id          BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '환전 기록 ID',
-    fx_rt_id            BIGINT         NOT NULL COMMENT '환전 기준 ID',
-    emp_id              BIGINT         NOT NULL COMMENT '직원 ID',
+    fx_rt_id            BIGINT                             NOT NULL COMMENT '환전 기준 ID',
+    emp_id              BIGINT                             NOT NULL COMMENT '직원 ID',
+    cust_id             BIGINT                             NOT NULL COMMENT '고객 ID',
     fx_from_acct_id     BIGINT COMMENT '출금 계좌 ID',
     fx_to_acct_id       BIGINT COMMENT '입금 계좌 ID',
-    fx_from_amt         DECIMAL(18, 4) NOT NULL COMMENT '지불 금액',
-    fx_to_amt           DECIMAL(18, 4) NOT NULL COMMENT '환전 금액',
-    fx_trns_tp          VARCHAR(5)     NOT NULL COMMENT '거래 타입',
-    fx_exchange_purpose VARCHAR(5)     NOT NULL COMMENT '거래 유형/성격',
+    fx_from_amt         DECIMAL(18, 4)                     NOT NULL COMMENT '지불 금액',
+    fx_to_amt           DECIMAL(18, 4)                     NOT NULL COMMENT '환전 금액',
+    fx_trns_tp          VARCHAR(5)                         NOT NULL COMMENT '거래 타입',
+    fx_exchange_purpose VARCHAR(5)                         NOT NULL COMMENT '거래 유형/성격',
+    fx_req_dt           DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '환전 신청일',
     fx_trns_dt          DATETIME COMMENT '거래 일',
-    fx_trns_cd          VARCHAR(5)     NOT NULL COMMENT '거래 진행 상태',
+    fx_trns_cd          VARCHAR(5)                         NOT NULL COMMENT '거래 진행 상태',
     FOREIGN KEY (fx_rt_id) REFERENCES fx_rt_history (fx_rt_id),
     FOREIGN KEY (emp_id) REFERENCES employees (emp_id),
+    FOREIGN KEY (cust_id) REFERENCES customer (cust_id),
     FOREIGN KEY (fx_from_acct_id) REFERENCES account (acct_id),
     FOREIGN KEY (fx_to_acct_id) REFERENCES account (acct_id)
 );
+
+# ALTER TABLE fx_currency_exchange
+#     ADD COLUMN cust_id BIGINT NOT NULL COMMENT '고객 ID' AFTER emp_id,
+#     ADD FOREIGN KEY (cust_id)
+#         REFERENCES customer (cust_id);
+
+ALTER TABLE fx_currency_exchange
+    ADD COLUMN fx_req_dt DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '환전 신청일' AFTER fx_exchange_purpose;
 
 # 제휴사 테이블
 CREATE TABLE partner
@@ -183,7 +194,7 @@ CREATE TABLE partner
     part_nm     VARCHAR(100) NOT NULL UNIQUE COMMENT '제휴사명',
     part_tp     VARCHAR(50)  NOT NULL COMMENT '제휴사 타입',
     part_use_yn CHAR(1)      NOT NULL DEFAULT 'Y' COMMENT '사용 여부' CHECK ( part_use_yn IN ('Y', 'N')),
-    part_code VARCHAR(50) COMMENT '통신 시 보험사 코드'
+    part_code   VARCHAR(50) COMMENT '통신 시 보험사 코드'
 );
 
 # alter TABLE partner
