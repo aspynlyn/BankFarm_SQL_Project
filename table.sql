@@ -302,3 +302,21 @@ ALTER TABLE customer
 # FROM performance_schema.data_locks;
 # SELECT *
 # FROM performance_schema.data_lock_waits;
+
+-- 스키마 용량 확인
+SELECT
+    table_schema,
+    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS total_mb
+FROM information_schema.tables
+GROUP BY table_schema;
+
+-- 테이블별 용량 확인
+SELECT
+    table_name,
+    ROUND((data_length + index_length) / 1024 / 1024, 2) AS total_mb
+FROM information_schema.tables
+WHERE table_schema = 'db_odd_adv_2'
+ORDER BY total_mb DESC;
+
+select count(1)
+from insr_payment_history;
