@@ -182,8 +182,13 @@ CREATE TABLE partner
     part_id     BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '제휴사 ID',
     part_nm     VARCHAR(100) NOT NULL UNIQUE COMMENT '제휴사명',
     part_tp     VARCHAR(50)  NOT NULL COMMENT '제휴사 타입',
-    part_use_yn CHAR(1)      NOT NULL DEFAULT 'Y' COMMENT '사용 여부' CHECK ( part_use_yn IN ('Y', 'N'))
+    part_use_yn CHAR(1)      NOT NULL DEFAULT 'Y' COMMENT '사용 여부' CHECK ( part_use_yn IN ('Y', 'N')),
+    part_code VARCHAR(50) COMMENT '통신 시 보험사 코드'
 );
+
+# alter TABLE partner
+# add COLUMN     part_code VARCHAR(50) COMMENT '통신 시 보험사 코드';
+
 
 # 제휴사 계약 테이블
 CREATE TABLE part_contract
@@ -218,6 +223,7 @@ CREATE TABLE insr_contract
     insr_prod_id        BIGINT     NOT NULL COMMENT '보험 상품 ID',
     cust_id             BIGINT     NOT NULL COMMENT '고객 ID',
     emp_id              BIGINT     NOT NULL COMMENT '직원 ID',
+    part_id             BIGINT     NOT NULL COMMENT '계약 보험사 ID',
     insr_contract_num   VARCHAR(20) COMMENT '계약 번호',
     insr_bank_cd        CHAR(5) COMMENT '계약 은행 코드',
     insr_acct_num       VARCHAR(20) COMMENT '계약 계좌 번호',
@@ -231,8 +237,27 @@ CREATE TABLE insr_contract
     insr_payment_day    TINYINT    NOT NULL COMMENT '납입일(1~28)' CHECK ( insr_payment_day BETWEEN 1 AND 28),
     FOREIGN KEY (insr_prod_id) REFERENCES insr_prod (insr_prod_id),
     FOREIGN KEY (emp_id) REFERENCES employees (emp_id),
-    FOREIGN KEY (cust_id) REFERENCES customer (cust_id)
+    FOREIGN KEY (cust_id) REFERENCES customer (cust_id),
+    FOREIGN KEY (part_id) REFERENCES partner (part_id),
+    UNIQUE INDEX uq_part_contract_num (part_id, insr_contract_num)
 );
+
+# ALTER TABLE insr_contract
+# ADD COLUMN part_id BIGINT NULL COMMENT '제휴사 ID';
+#
+# UPDATE insr_contract c
+# JOIN insr_prod p ON p.insr_prod_id = c.insr_prod_id
+# SET c.part_id = p.part_id;
+#
+# ALTER TABLE insr_contract
+# MODIFY COLUMN part_id BIGINT NOT NULL,
+# ADD CONSTRAINT fk_insr_contract_partner
+#     FOREIGN KEY (part_id)
+#     REFERENCES partner(part_id),
+# ADD UNIQUE INDEX uq_part_contract_num (part_id, insr_contract_num);
+#
+# ALTER TABLE insr_contract
+# MODIFY COLUMN part_id BIGINT NOT NULL COMMENT '계약한 보험사 ID' AFTER emp_id;
 
 # 보험 납입 내역 테이블
 CREATE TABLE insr_payment_history

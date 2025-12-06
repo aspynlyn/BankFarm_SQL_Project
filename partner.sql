@@ -44,3 +44,19 @@ VALUES
 
 -- 10 케이비손해보험: 현재 살아있는 계약(Y)
 (10, '2023-11-01', '2026-11-01', 'Y');
+
+UPDATE partner
+SET part_code = CASE part_nm
+    WHEN '삼성생명'     THEN 'SAMSUNG_LIFE'
+    WHEN '한화생명'     THEN 'HANHWA_LIFE'
+    WHEN '교보생명'     THEN 'KYOBO_LIFE'
+    WHEN 'DB손해보험'   THEN 'DB_SGI'
+    WHEN '메리츠화재'   THEN 'MERITZ_FIRE'
+    WHEN '현대해상'     THEN 'HYUNDAI_MARINE'
+    WHEN '농협손보'     THEN 'NH_FARM_INS'
+    WHEN '흥국생명'     THEN 'HEUNGKUK_LIFE'
+    WHEN '라이나생명'   THEN 'LINA_LIFE'
+    WHEN '푸본현대생명' THEN 'FUBON_HYUNDAI_LIFE'
+    ELSE part_code  -- 혹시 다른 제휴사 있을 때 기존 값 유지
+END
+WHERE part_code IS NULL;
