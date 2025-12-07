@@ -49,6 +49,7 @@ WHERE h.insr_paid_yn = 'N'
 AND c.insr_active_cd = 'CS001'
 GROUP BY c.cust_id, c.insr_contract_id;
 
+-- 계약별 남은 회차수, 납입 금액 조회
 SELECT
     c.insr_contract_id,
     c.cust_id,
@@ -61,4 +62,24 @@ WHERE h.insr_payment_dt > CURRENT_DATE()
   AND c.insr_active_cd = 'CS001'
 GROUP BY c.insr_contract_id, c.cust_id
 HAVING remaining_seq_cnt > 0
-ORDER BY remaining_expected_amt DESC;
+ORDER BY remaining_expected_amt;
+
+-- 날짜 범위, 계약 기준 인덱스 생성
+CREATE INDEX idx_insr_pay_contract_dt
+ON insr_payment_history ( insr_contract_id, insr_payment_dt);
+
+-- 상태, 계약, 고객 기준 인덱스 생성
+CREATE INDEX idx_insr_contract_active
+ON insr_contract (insr_active_cd, insr_contract_id, cust_id);
+
+-- 날짜 별 파티션 생성
+ALTER TABLE insr_payment_history
+PARTITION BY RANGE COLUMNS (insr_payment_dt) (
+    PARTITION p2020 VALUES LESS THAN ('2021-01-01'),
+    PARTITION p2021 VALUES LESS THAN ('2022-01-01'),
+    PARTITION p2022 VALUES LESS THAN ('2023-01-01'),
+    PARTITION p2023 VALUES LESS THAN ('2024-01-01'),
+    PARTITION p2024 VALUES LESS THAN ('2025-01-01'),
+    PARTITION p2025 VALUES LESS THAN ('2026-01-01'),
+    PARTITION pmax  VALUES LESS THAN (MAXVALUE)
+);
