@@ -1,3 +1,4 @@
+-- 환전 거래기록 생성 시 입출금 내역 저장
 DELIMITER $$
 
 CREATE TRIGGER trg_insert_currency_exchange

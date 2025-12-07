@@ -37,6 +37,7 @@ WHERE insr_contract_num = 'IC20251206263294'
     WHERE c.insr_contract_num = 'IC20251206263294'
       AND p.part_id = (SELECT part_id from partner where part_code = 'HANHWA_LIFE');
 
+Explain ANALYZE
 SELECT
     c.cust_id,
     c.insr_contract_id,
@@ -47,3 +48,17 @@ JOIN insr_payment_history h
 WHERE h.insr_paid_yn = 'N'
 AND c.insr_active_cd = 'CS001'
 GROUP BY c.cust_id, c.insr_contract_id;
+
+SELECT
+    c.insr_contract_id,
+    c.cust_id,
+    COUNT(*) AS remaining_seq_cnt,
+    SUM(h.insr_expected_amt) AS remaining_expected_amt
+FROM insr_contract c
+JOIN insr_payment_history h
+  ON c.insr_contract_id = h.insr_contract_id
+WHERE h.insr_payment_dt > CURRENT_DATE()
+  AND c.insr_active_cd = 'CS001'
+GROUP BY c.insr_contract_id, c.cust_id
+HAVING remaining_seq_cnt > 0
+ORDER BY remaining_expected_amt DESC;
