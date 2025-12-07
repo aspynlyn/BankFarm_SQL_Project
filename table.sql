@@ -320,3 +320,8 @@ ORDER BY total_mb DESC;
 
 select count(1)
 from insr_payment_history;
+
+
+SELECT SUM(TABLE_ROWS) AS total_rows
+FROM information_schema.tables
+WHERE table_schema = 'db_odd_adv_2';

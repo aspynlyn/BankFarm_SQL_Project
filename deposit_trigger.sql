@@ -190,6 +190,7 @@ BEGIN
                 v_contract_acct_bal + new.depo_paid_amt,
                 1,
                 '적금 납입');
+
     END IF;
 END$$
 
