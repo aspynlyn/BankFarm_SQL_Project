@@ -109,6 +109,47 @@ SET d.depo_base_acct_id = a.base_acct_id
 WHERE d.depo_base_acct_id IS NULL
   AND p.depo_prod_tp != 'DO001';
 
-update depo_prod
-set depo_intrst_calc_tp = 'DO026'
-where depo_prod_tp = 'DO001';
+UPDATE depo_prod
+SET depo_intrst_calc_tp = 'DO026'
+WHERE depo_prod_tp = 'DO001';
+
+EXPLAIN
+SELECT c.depo_contract_id,
+       c.cust_id,
+       cs.depo_payment_day,
+       cs.depo_missed_cnt,
+       sp.depo_payment_id,
+       sp.depo_paid_dt,
+       sp.depo_paid_amt,
+       sp.depo_payment_yn
+FROM depo_contract c
+         JOIN depo_contract_savings cs
+              ON c.depo_contract_id = cs.depo_contract_id
+         JOIN depo_savings_payment sp
+              ON c.depo_contract_id = sp.depo_contract_id
+WHERE sp.depo_payment_yn = 'N'
+  AND DATE(sp.depo_paid_dt) < CURRENT_DATE()
+  AND c.depo_active_cd != 'CS002'
+  AND c.depo_active_cd != 'CS003'
+  AND c.depo_active_cd != 'CS004'
+ORDER BY sp.depo_paid_dt;
+
+EXPLAIN
+SELECT
+    c.depo_contract_id,
+    c.cust_id,
+    cs.depo_payment_day,
+    cs.depo_missed_cnt,
+    sp.depo_payment_id,
+    sp.depo_paid_dt,
+    sp.depo_paid_amt,
+    sp.depo_payment_yn
+FROM depo_contract c
+JOIN depo_contract_savings cs
+  ON c.depo_contract_id = cs.depo_contract_id
+JOIN depo_savings_payment sp
+  ON c.depo_contract_id = sp.depo_contract_id
+ AND sp.depo_payment_yn = 'N'
+ AND sp.depo_paid_dt < CURRENT_DATE()
+WHERE c.depo_active_cd = 'CS001'
+ORDER BY sp.depo_paid_dt;

@@ -35,5 +35,15 @@ WHERE insr_contract_num = 'IC20251206263294'
     on c.insr_contract_id = h.insr_contract_id
     and h.insr_payment_seq = 10
     WHERE c.insr_contract_num = 'IC20251206263294'
-      AND p.part_id = 1;
+      AND p.part_id = (SELECT part_id from partner where part_code = 'HANHWA_LIFE');
 
+SELECT
+    c.cust_id,
+    c.insr_contract_id,
+    COUNT(*) AS unpaid_seq_cnt
+FROM insr_contract c
+JOIN insr_payment_history h
+  ON c.insr_contract_id = h.insr_contract_id
+WHERE h.insr_paid_yn = 'N'
+AND c.insr_active_cd = 'CS001'
+GROUP BY c.cust_id, c.insr_contract_id;
