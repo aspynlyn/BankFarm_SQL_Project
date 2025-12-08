@@ -277,22 +277,21 @@ ON depo_savings_payment (
 DROP INDEX idx_sp_yn_paid_dt_contract ON depo_savings_payment;
 
 
-SELECT
-    c.depo_contract_id,
-    c.cust_id,
-    cs.depo_payment_day,
-    cs.depo_missed_cnt,
-    sp.depo_payment_id,
-    sp.depo_paid_dt,
-    sp.depo_paid_amt,
-    sp.depo_payment_yn
+SELECT c.depo_contract_id,
+       c.cust_id,
+       cs.depo_payment_day,
+       cs.depo_missed_cnt,
+       sp.depo_payment_id,
+       sp.depo_paid_dt,
+       sp.depo_paid_amt,
+       sp.depo_payment_yn
 FROM depo_contract c
-JOIN depo_contract_savings cs
-  ON c.depo_contract_id = cs.depo_contract_id
-JOIN depo_savings_payment sp
-  ON c.depo_contract_id = sp.depo_contract_id
- AND sp.depo_payment_yn = 'N'
- AND sp.depo_paid_dt < CURRENT_DATE()
+         JOIN depo_contract_savings cs
+              ON c.depo_contract_id = cs.depo_contract_id
+         JOIN depo_savings_payment sp
+              ON c.depo_contract_id = sp.depo_contract_id
+                  AND sp.depo_payment_yn = 'N'
+                  AND sp.depo_paid_dt < CURRENT_DATE()
 WHERE c.depo_active_cd = 'CS001'
 ORDER BY sp.depo_paid_dt;
 
