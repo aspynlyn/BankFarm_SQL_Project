@@ -113,7 +113,7 @@ BEGIN
 
     -- 계좌에서 출금하는 계약인데 출금 계좌가 없으면 에러
     IF p_depo_paid_cash_yn = 'N' AND p_base_acct_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 납입인데 출금 계좌 ID가 없습니다.';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '계좌 납입은 출금 계좌가 반드시 존재해야 합니다.';
     END IF;
 
     -- 예치/납입 금액 기본 검증

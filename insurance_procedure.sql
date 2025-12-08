@@ -81,7 +81,7 @@ BEGIN
     IF v_total_cnt = v_paid_cnt THEN
         UPDATE insr_contract
         SET insr_active_cd = 'CS002' -- 계약코드(만기)
-        WHERE insr_contract_id = v_contract_id;
+        WHERE insr_contract_id = v_contract_id;A
     END IF;
 
 END$$
