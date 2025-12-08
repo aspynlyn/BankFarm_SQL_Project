@@ -83,6 +83,7 @@ BEGIN
         SET insr_active_cd = 'CS002' -- 계약코드(만기)
         WHERE insr_contract_id = v_contract_id;
     END IF;
+
 END$$
 
 DELIMITER ;
