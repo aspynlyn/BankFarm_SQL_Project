@@ -28,6 +28,10 @@ BEGIN
                , p_part_code);
 
         SET v_part_id = LAST_INSERT_ID();
+    ELSE
+        UPDATE partner
+        SET part_use_yn = 'Y'
+        WHERE part_id = v_part_id;
     END IF;
 
     -- 3. 제휴사 계약 테이블에 insert

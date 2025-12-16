@@ -22,9 +22,9 @@ BEGIN
 
     -- 제휴사 코드로 제휴사 id 조회
     SELECT part_id
-    into v_part_id
-    from partner
-    where part_code = p_part_cd;
+    INTO v_part_id
+    FROM partner
+    WHERE part_code = p_part_cd;
 
     -- 보험사의 계약 번호로 계약 id조회, 해당 회차 스케줄(납입 예정일) 조회
     SELECT p.insr_contract_id, p.insr_payment_dt
@@ -35,12 +35,13 @@ BEGIN
                       AND p.insr_payment_seq = p_insr_payment_seq
     WHERE c.insr_contract_num = p_insr_constract_num
       AND c.part_id = v_part_id
-    FOR UPDATE ;
+        FOR
+    UPDATE;
 
     -- 보험사가 없으면 에러
     IF v_part_id IS NULL THEN
-    SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = '제휴사를 찾을 수 없습니다.';
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = '제휴사를 찾을 수 없습니다.';
     END IF;
 
     -- 스케줄이 없으면 에러
@@ -81,7 +82,7 @@ BEGIN
     IF v_total_cnt = v_paid_cnt THEN
         UPDATE insr_contract
         SET insr_active_cd = 'CS002' -- 계약코드(만기)
-        WHERE insr_contract_id = v_contract_id;A
+        WHERE insr_contract_id = v_contract_id;
     END IF;
 
 END$$
